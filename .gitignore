@@ -78,8 +78,9 @@ venv.bak/
 dmypy.json
 
 # Data files - large archives and extracted data
-data/*.zip
-data/extracted/
+data/*
+docs/*
+
 
 # Database files
 *.db
