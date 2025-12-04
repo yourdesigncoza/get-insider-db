@@ -6,6 +6,7 @@ Loads environment variables from a .env file in the project root.
 
 import os
 from functools import lru_cache
+from pathlib import Path
 
 from dotenv import load_dotenv
 from sqlalchemy import create_engine
@@ -17,7 +18,8 @@ DATABASE_URL = os.getenv(
     "DATABASE_URL",
     "postgresql://user:pass@localhost:5432/insider_data",
 )
-DATA_DIR = os.getenv("DATA_DIR", "data")
+# Default to the extracted data root from the prompt guidance.
+DATA_DIR = Path(os.getenv("DATA_DIR", "data/extracted"))
 
 
 @lru_cache(maxsize=1)

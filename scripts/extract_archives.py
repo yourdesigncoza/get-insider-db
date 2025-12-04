@@ -5,8 +5,14 @@ Extract all .zip files in DATA_DIR into DATA_DIR/extracted, skipping ones alread
 Keeps a simple log file (extracted.txt) in DATA_DIR listing processed zip filenames.
 """
 
+import sys
 import zipfile
 from pathlib import Path
+
+# Allow running the script directly without installing the package.
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
 from src.config import DATA_DIR
 

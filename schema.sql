@@ -1,0 +1,161 @@
+-- clusters
+-- -------------------
+-- id: int8
+-- issuer_ticker: varchar(32)
+-- window_start_date: date
+-- window_end_date: date
+-- filings_count: int4
+-- insiders_count: int4
+-- officers_count: int4
+-- ceo_cfo_count: int4
+-- total_shares: numeric(24,4)
+-- total_value_usd: numeric(24,2)
+-- has_ten_percent: bool
+-- has_ceo: bool
+-- has_cfo: bool
+-- notes: text
+-- created_at: timestamp(6)
+
+-- form345_deriv_trans
+-- -------------------
+-- ACCESSION_NUMBER: text
+-- DERIV_TRANS_SK: text
+-- SECURITY_TITLE: text
+-- SECURITY_TITLE_FN: text
+-- CONV_EXERCISE_PRICE: text
+-- CONV_EXERCISE_PRICE_FN: text
+-- TRANS_DATE: text
+-- TRANS_DATE_FN: text
+-- DEEMED_EXECUTION_DATE: text
+-- DEEMED_EXECUTION_DATE_FN: text
+-- TRANS_FORM_TYPE: text
+-- TRANS_CODE: text
+-- EQUITY_SWAP_INVOLVED: text
+-- EQUITY_SWAP_TRANS_CD_FN: text
+-- TRANS_TIMELINESS: text
+-- TRANS_TIMELINESS_FN: text
+-- TRANS_SHARES: text
+-- TRANS_SHARES_FN: text
+-- TRANS_TOTAL_VALUE: text
+-- TRANS_TOTAL_VALUE_FN: text
+-- TRANS_PRICEPERSHARE: text
+-- TRANS_PRICEPERSHARE_FN: text
+-- TRANS_ACQUIRED_DISP_CD: text
+-- TRANS_ACQUIRED_DISP_CD_FN: text
+-- EXCERCISE_DATE: text
+-- EXCERCISE_DATE_FN: text
+-- EXPIRATION_DATE: text
+-- EXPIRATION_DATE_FN: text
+-- UNDLYNG_SEC_TITLE: text
+-- UNDLYNG_SEC_TITLE_FN: text
+-- UNDLYNG_SEC_SHARES: text
+-- UNDLYNG_SEC_SHARES_FN: text
+-- UNDLYNG_SEC_VALUE: text
+-- UNDLYNG_SEC_VALUE_FN: text
+-- SHRS_OWND_FOLWNG_TRANS: text
+-- SHRS_OWND_FOLWNG_TRANS_FN: text
+-- VALU_OWND_FOLWNG_TRANS: text
+-- VALU_OWND_FOLWNG_TRANS_FN: text
+-- DIRECT_INDIRECT_OWNERSHIP: text
+-- DIRECT_INDIRECT_OWNERSHIP_FN: text
+-- NATURE_OF_OWNERSHIP: text
+-- NATURE_OF_OWNERSHIP_FN: text
+
+-- form345_nonderiv_trans
+-- -------------------
+-- ACCESSION_NUMBER: text
+-- NONDERIV_TRANS_SK: text
+-- SECURITY_TITLE: text
+-- SECURITY_TITLE_FN: text
+-- TRANS_DATE: text
+-- TRANS_DATE_FN: text
+-- DEEMED_EXECUTION_DATE: text
+-- DEEMED_EXECUTION_DATE_FN: text
+-- TRANS_FORM_TYPE: text
+-- TRANS_CODE: text
+-- EQUITY_SWAP_INVOLVED: text
+-- EQUITY_SWAP_TRANS_CD_FN: text
+-- TRANS_TIMELINESS: text
+-- TRANS_TIMELINESS_FN: text
+-- TRANS_SHARES: text
+-- TRANS_SHARES_FN: text
+-- TRANS_PRICEPERSHARE: text
+-- TRANS_PRICEPERSHARE_FN: text
+-- TRANS_ACQUIRED_DISP_CD: text
+-- TRANS_ACQUIRED_DISP_CD_FN: text
+-- SHRS_OWND_FOLWNG_TRANS: text
+-- SHRS_OWND_FOLWNG_TRANS_FN: text
+-- VALU_OWND_FOLWNG_TRANS: text
+-- VALU_OWND_FOLWNG_TRANS_FN: text
+-- DIRECT_INDIRECT_OWNERSHIP: text
+-- DIRECT_INDIRECT_OWNERSHIP_FN: text
+-- NATURE_OF_OWNERSHIP: text
+-- NATURE_OF_OWNERSHIP_FN: text
+
+-- form345_reportingowner
+-- -------------------
+-- ACCESSION_NUMBER: text
+-- RPTOWNERCIK: text
+-- RPTOWNERNAME: text
+-- RPTOWNER_RELATIONSHIP: text
+-- RPTOWNER_TITLE: text
+-- RPTOWNER_TXT: text
+-- RPTOWNER_STREET1: text
+-- RPTOWNER_STREET2: text
+-- RPTOWNER_CITY: text
+-- RPTOWNER_STATE: text
+-- RPTOWNER_ZIPCODE: text
+-- RPTOWNER_STATE_DESC: text
+-- FILE_NUMBER: text
+
+-- form345_submission
+-- -------------------
+-- ACCESSION_NUMBER: text
+-- FILING_DATE: text
+-- PERIOD_OF_REPORT: text
+-- DATE_OF_ORIG_SUB: text
+-- NO_SECURITIES_OWNED: text
+-- NOT_SUBJECT_SEC16: text
+-- FORM3_HOLDINGS_REPORTED: text
+-- FORM4_TRANS_REPORTED: text
+-- DOCUMENT_TYPE: text
+-- ISSUERCIK: text
+-- ISSUERNAME: text
+-- ISSUERTRADINGSYMBOL: text
+-- REMARKS: text
+-- AFF10B5ONE: text
+
+-- form4_raw
+-- -------------------
+-- id: int8
+-- accession_number: varchar(64)
+-- filed_at: timestamp(6)
+-- issuer_cik: varchar(20)
+-- issuer_name: varchar(255)
+-- issuer_ticker: varchar(32)
+-- raw_json: jsonb
+-- created_at: timestamp(6)
+
+-- insider_trades
+-- -------------------
+-- id: int8
+-- filing_id: int8
+-- filed_at: timestamp(6)
+-- trade_date: date
+-- issuer_ticker: varchar(32)
+-- issuer_cik: varchar(20)
+-- insider_name: varchar(255)
+-- insider_cik: varchar(20)
+-- insider_relationships: _varchar
+-- is_officer: bool
+-- is_director: bool
+-- is_ten_percent: bool
+-- is_ceo: bool
+-- is_cfo: bool
+-- transaction_code: varchar(4)
+-- security_title: varchar(255)
+-- shares: numeric(24,4)
+-- price: numeric(18,4)
+-- value_usd: numeric(24,2)
+-- ownership_direct: bool
+-- created_at: timestamp(6)
