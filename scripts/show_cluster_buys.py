@@ -17,12 +17,46 @@ try:
     from tabulate import tabulate
 except Exception:  # pragma: no cover - optional dependency
     tabulate = None
+try:
+    from rich.console import Console
+    from rich.table import Table
+    from rich import box
+except Exception:  # pragma: no cover - optional dependency
+    Console = None
+    Table = None
 
 from src.analytics.cluster_buys import get_top_cluster_buys
 
 
 def format_rows(rows: List[Any]) -> None:
-    if tabulate:
+    if Console and Table:
+        console = Console()
+        table = Table(show_header=True, header_style="bold cyan", box=box.MARKDOWN)
+        columns = [
+            ("ticker", "Ticker", "left"),
+            ("window_start", "Start", "center"),
+            ("window_end", "End", "center"),
+            ("num_insiders", "Insiders", "right"),
+            ("num_trades", "Trades", "right"),
+            ("total_value", "Total Value", "right"),
+            ("total_shares", "Shares", "right"),
+            ("top_insiders", "Insiders", "left"),
+        ]
+        for _, title, justify in columns:
+            table.add_column(title, justify=justify)
+        for row in rows:
+            table.add_row(
+                str(row.get("ticker", "")),
+                str(row.get("window_start", "")),
+                str(row.get("window_end", "")),
+                f"{int(row.get('num_insiders', 0)):,}",
+                f"{int(row.get('num_trades', 0)):,}",
+                f"${float(row.get('total_value', 0.0)):,.0f}",
+                f"{float(row.get('total_shares', 0.0)):,.0f}",
+                row.get("top_insiders", "") or "—",
+            )
+        console.print(table)
+    elif tabulate:
         print(
             tabulate(
                 rows,

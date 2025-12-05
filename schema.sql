@@ -1,161 +1,93 @@
--- clusters
--- -------------------
--- id: int8
--- issuer_ticker: varchar(32)
--- window_start_date: date
--- window_end_date: date
--- filings_count: int4
--- insiders_count: int4
--- officers_count: int4
--- ceo_cfo_count: int4
--- total_shares: numeric(24,4)
--- total_value_usd: numeric(24,2)
--- has_ten_percent: bool
--- has_ceo: bool
--- has_cfo: bool
--- notes: text
--- created_at: timestamp(6)
+-- No foreign key relationships found in the database.
 
--- form345_deriv_trans
--- -------------------
--- ACCESSION_NUMBER: text
--- DERIV_TRANS_SK: text
--- SECURITY_TITLE: text
--- SECURITY_TITLE_FN: text
--- CONV_EXERCISE_PRICE: text
--- CONV_EXERCISE_PRICE_FN: text
--- TRANS_DATE: text
--- TRANS_DATE_FN: text
--- DEEMED_EXECUTION_DATE: text
--- DEEMED_EXECUTION_DATE_FN: text
--- TRANS_FORM_TYPE: text
--- TRANS_CODE: text
--- EQUITY_SWAP_INVOLVED: text
--- EQUITY_SWAP_TRANS_CD_FN: text
--- TRANS_TIMELINESS: text
--- TRANS_TIMELINESS_FN: text
--- TRANS_SHARES: text
--- TRANS_SHARES_FN: text
--- TRANS_TOTAL_VALUE: text
--- TRANS_TOTAL_VALUE_FN: text
--- TRANS_PRICEPERSHARE: text
--- TRANS_PRICEPERSHARE_FN: text
--- TRANS_ACQUIRED_DISP_CD: text
--- TRANS_ACQUIRED_DISP_CD_FN: text
--- EXCERCISE_DATE: text
--- EXCERCISE_DATE_FN: text
--- EXPIRATION_DATE: text
--- EXPIRATION_DATE_FN: text
--- UNDLYNG_SEC_TITLE: text
--- UNDLYNG_SEC_TITLE_FN: text
--- UNDLYNG_SEC_SHARES: text
--- UNDLYNG_SEC_SHARES_FN: text
--- UNDLYNG_SEC_VALUE: text
--- UNDLYNG_SEC_VALUE_FN: text
--- SHRS_OWND_FOLWNG_TRANS: text
--- SHRS_OWND_FOLWNG_TRANS_FN: text
--- VALU_OWND_FOLWNG_TRANS: text
--- VALU_OWND_FOLWNG_TRANS_FN: text
--- DIRECT_INDIRECT_OWNERSHIP: text
--- DIRECT_INDIRECT_OWNERSHIP_FN: text
--- NATURE_OF_OWNERSHIP: text
--- NATURE_OF_OWNERSHIP_FN: text
+CREATE TABLE public.form345_deriv_trans (
+    submission_id TEXT,
+    transaction_date DATE,
+    issuer_cik TEXT,
+    issuer_name TEXT,
+    rpt_owner_cik TEXT,
+    rpt_owner_name TEXT,
+    transaction_code TEXT,
+    transaction_shares BIGINT,
+    shares_owned_following_transaction BIGINT,
+    underlying_security_title TEXT,
+    underlying_shares BIGINT,
+    conversion_or_exercise_price DOUBLE PRECISION
+);
 
--- form345_nonderiv_trans
--- -------------------
--- ACCESSION_NUMBER: text
--- NONDERIV_TRANS_SK: text
--- SECURITY_TITLE: text
--- SECURITY_TITLE_FN: text
--- TRANS_DATE: text
--- TRANS_DATE_FN: text
--- DEEMED_EXECUTION_DATE: text
--- DEEMED_EXECUTION_DATE_FN: text
--- TRANS_FORM_TYPE: text
--- TRANS_CODE: text
--- EQUITY_SWAP_INVOLVED: text
--- EQUITY_SWAP_TRANS_CD_FN: text
--- TRANS_TIMELINESS: text
--- TRANS_TIMELINESS_FN: text
--- TRANS_SHARES: text
--- TRANS_SHARES_FN: text
--- TRANS_PRICEPERSHARE: text
--- TRANS_PRICEPERSHARE_FN: text
--- TRANS_ACQUIRED_DISP_CD: text
--- TRANS_ACQUIRED_DISP_CD_FN: text
--- SHRS_OWND_FOLWNG_TRANS: text
--- SHRS_OWND_FOLWNG_TRANS_FN: text
--- VALU_OWND_FOLWNG_TRANS: text
--- VALU_OWND_FOLWNG_TRANS_FN: text
--- DIRECT_INDIRECT_OWNERSHIP: text
--- DIRECT_INDIRECT_OWNERSHIP_FN: text
--- NATURE_OF_OWNERSHIP: text
--- NATURE_OF_OWNERSHIP_FN: text
+CREATE TABLE public.form345_nonderiv_trans (
+    submission_id TEXT,
+    transaction_date DATE,
+    issuer_cik TEXT,
+    issuer_name TEXT,
+    rpt_owner_cik TEXT,
+    rpt_owner_name TEXT,
+    transaction_code TEXT,
+    transaction_shares BIGINT,
+    transaction_price_per_share DOUBLE PRECISION,
+    shares_owned_following_transaction BIGINT
+);
 
--- form345_reportingowner
--- -------------------
--- ACCESSION_NUMBER: text
--- RPTOWNERCIK: text
--- RPTOWNERNAME: text
--- RPTOWNER_RELATIONSHIP: text
--- RPTOWNER_TITLE: text
--- RPTOWNER_TXT: text
--- RPTOWNER_STREET1: text
--- RPTOWNER_STREET2: text
--- RPTOWNER_CITY: text
--- RPTOWNER_STATE: text
--- RPTOWNER_ZIPCODE: text
--- RPTOWNER_STATE_DESC: text
--- FILE_NUMBER: text
+CREATE TABLE public.form345_reportingowner (
+    submission_id TEXT,
+    issuer_cik TEXT,
+    issuer_name TEXT,
+    rpt_owner_cik TEXT,
+    rpt_owner_name TEXT,
+    is_director BOOLEAN,
+    is_officer BOOLEAN,
+    is_ten_percent_owner BOOLEAN,
+    is_other BOOLEAN,
+    officer_title TEXT
+);
 
--- form345_submission
--- -------------------
--- ACCESSION_NUMBER: text
--- FILING_DATE: text
--- PERIOD_OF_REPORT: text
--- DATE_OF_ORIG_SUB: text
--- NO_SECURITIES_OWNED: text
--- NOT_SUBJECT_SEC16: text
--- FORM3_HOLDINGS_REPORTED: text
--- FORM4_TRANS_REPORTED: text
--- DOCUMENT_TYPE: text
--- ISSUERCIK: text
--- ISSUERNAME: text
--- ISSUERTRADINGSYMBOL: text
--- REMARKS: text
--- AFF10B5ONE: text
+CREATE TABLE public.form345_submission (
+    submission_id TEXT,
+    filing_date DATE,
+    issue_cik TEXT,
+    issuer_name TEXT,
+    rpt_owner_cik TEXT,
+    rpt_owner_name TEXT
+);
 
--- form4_raw
--- -------------------
--- id: int8
--- accession_number: varchar(64)
--- filed_at: timestamp(6)
--- issuer_cik: varchar(20)
--- issuer_name: varchar(255)
--- issuer_ticker: varchar(32)
--- raw_json: jsonb
--- created_at: timestamp(6)
+CREATE TABLE public.insider_exclusions (
+    cik TEXT,
+    name TEXT
+);
 
--- insider_trades
--- -------------------
--- id: int8
--- filing_id: int8
--- filed_at: timestamp(6)
--- trade_date: date
--- issuer_ticker: varchar(32)
--- issuer_cik: varchar(20)
--- insider_name: varchar(255)
--- insider_cik: varchar(20)
--- insider_relationships: _varchar
--- is_officer: bool
--- is_director: bool
--- is_ten_percent: bool
--- is_ceo: bool
--- is_cfo: bool
--- transaction_code: varchar(4)
--- security_title: varchar(255)
--- shares: numeric(24,4)
--- price: numeric(18,4)
--- value_usd: numeric(24,2)
--- ownership_direct: bool
--- created_at: timestamp(6)
+CREATE TABLE public.insider_trades (
+    issuer_cik TEXT,
+    issuer_name TEXT,
+    rpt_owner_cik TEXT,
+    rpt_owner_name TEXT,
+    transaction_date DATE,
+    transaction_code TEXT,
+    transaction_shares BIGINT,
+    transaction_price_per_share DOUBLE PRECISION,
+    shares_owned_following_transaction BIGINT
+);
+
+CREATE TABLE public.insider_buy_signals (
+    issuer_cik TEXT,
+    issuer_name TEXT,
+    transaction_date DATE,
+    total_transaction_shares BIGINT,
+    average_price_per_share DOUBLE PRECISION,
+    insider_count BIGINT
+);
+
+CREATE TABLE public.insider_trades_with_title (
+    issuer_cik TEXT,
+    issuer_name TEXT,
+    rpt_owner_cik TEXT,
+    rpt_owner_name TEXT,
+    is_director BOOLEAN,
+    is_officer BOOLEAN,
+    is_ten_percent_owner BOOLEAN,
+    officer_title TEXT,
+    transaction_date DATE,
+    transaction_code TEXT,
+    transaction_shares BIGINT,
+    transaction_price_per_share DOUBLE PRECISION,
+    shares_owned_following_transaction BIGINT
+);

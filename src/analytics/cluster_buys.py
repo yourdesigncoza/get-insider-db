@@ -11,6 +11,34 @@ from sqlalchemy.engine import Engine
 from src.config import DATABASE_URL
 
 
+def _first_nonempty(series: pd.Series) -> str:
+    """
+    Helper for groupby aggregations to pull the first non-blank string.
+    """
+    for value in series:
+        if isinstance(value, str):
+            trimmed = value.strip()
+            if trimmed:
+                return trimmed
+    return ""
+
+
+def _format_insider_label(
+    name: str, relationship: str | None, title: str | None
+) -> str:
+    rel = (relationship or "").strip()
+    role = (title or "").strip()
+
+    if rel.lower() == "officer":
+        descriptor = f"Officer, {role}" if role else "Officer"
+    elif rel and role:
+        descriptor = f"{rel}, {role}"
+    else:
+        descriptor = rel or role
+
+    return f"{name} ({descriptor})" if descriptor else name
+
+
 @dataclass
 class ClusterBuyEvent:
     ticker: str
@@ -108,21 +136,39 @@ def find_cluster_buys(
                       AND b2.transaction_date BETWEEN b.transaction_date - INTERVAL '{window_interval} day' AND b.transaction_date
                 ) AS total_value,
                 (
-                    SELECT string_agg(insider_name, ', ' ORDER BY sum_total_value DESC)
+                    SELECT string_agg(
+                        CASE
+                            WHEN LOWER(COALESCE(insider_relationship, '')) = 'officer' AND COALESCE(insider_title, '') <> ''
+                                THEN insider_name || ' (Officer, ' || insider_title || ')'
+                            WHEN LOWER(COALESCE(insider_relationship, '')) = 'officer'
+                                THEN insider_name || ' (Officer)'
+                            WHEN COALESCE(insider_relationship, '') <> '' AND COALESCE(insider_title, '') <> ''
+                                THEN insider_name || ' (' || insider_relationship || ', ' || insider_title || ')'
+                            WHEN COALESCE(insider_relationship, '') <> ''
+                                THEN insider_name || ' (' || insider_relationship || ')'
+                            WHEN COALESCE(insider_title, '') <> ''
+                                THEN insider_name || ' (' || insider_title || ')'
+                            ELSE insider_name
+                        END,
+                        ', ' ORDER BY sum_total_value DESC
+                    )
                     FROM (
-                        SELECT insider_name, SUM(total_value) AS sum_total_value
+                        SELECT
+                            insider_name,
+                            SUM(total_value) AS sum_total_value,
+                            MIN(insider_relationship) AS insider_relationship,
+                            MIN(insider_title) AS insider_title
                         FROM base b3
                         WHERE b3.ticker = b.ticker
                           AND b3.transaction_date BETWEEN b.transaction_date - INTERVAL '{window_interval} day' AND b.transaction_date
                         GROUP BY insider_name
                         ORDER BY sum_total_value DESC
-                        LIMIT 3
                     ) top3
                 ) AS top_insiders,
-                b.transaction_date
-            FROM base b
-        ),
-        filtered AS (
+            b.transaction_date
+        FROM base b
+    ),
+    filtered AS (
             SELECT *
             FROM computed
             WHERE num_insiders >= :min_insiders
@@ -175,7 +221,14 @@ def find_cluster_buys(
           )
     """ if use_exclusions else ""
     base_sql = f"""
-        SELECT ticker, transaction_date, insider_name, shares, total_value
+        SELECT
+            ticker,
+            transaction_date,
+            insider_name,
+            insider_relationship,
+            insider_title,
+            shares,
+            total_value
         FROM insider_buy_signals
         WHERE transaction_date BETWEEN :start_date AND :end_date
           AND ticker IS NOT NULL
@@ -193,6 +246,11 @@ def find_cluster_buys(
     base_df["transaction_date"] = pd.to_datetime(base_df["transaction_date"]).dt.date
     base_df["shares"] = pd.to_numeric(base_df["shares"], errors="coerce").fillna(0.0)
     base_df["total_value"] = pd.to_numeric(base_df["total_value"], errors="coerce").fillna(0.0)
+    for col in ("insider_relationship", "insider_title"):
+        if col not in base_df.columns:
+            base_df[col] = ""
+        else:
+            base_df[col] = base_df[col].fillna("").astype(str)
 
     merged_records = []
     for ticker_value, tdf in df.groupby("ticker"):
@@ -219,13 +277,19 @@ def find_cluster_buys(
             num_insiders = subset["insider_name"].nunique()
             total_shares = subset["shares"].sum()
             total_value = subset["total_value"].sum()
-            top_series = (
-                subset.groupby("insider_name")["total_value"]
-                .sum()
-                .sort_values(ascending=False)
-                .head(3)
+            grouped = (
+                subset.groupby("insider_name")
+                .agg(
+                    total_value=("total_value", "sum"),
+                    relationship=("insider_relationship", _first_nonempty),
+                    title=("insider_title", _first_nonempty),
+                )
+                .sort_values("total_value", ascending=False)
             )
-            top_insiders = ", ".join(top_series.index)
+            top_insiders = ", ".join(
+                _format_insider_label(name, row.get("relationship"), row.get("title"))
+                for name, row in grouped.iterrows()
+            )
             merged_records.append(
                 {
                     "ticker": ticker_value,
