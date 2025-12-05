@@ -91,3 +91,18 @@ CREATE TABLE public.insider_trades_with_title (
     transaction_price_per_share DOUBLE PRECISION,
     shares_owned_following_transaction BIGINT
 );
+
+CREATE TABLE public.insider_entities (
+    id SERIAL PRIMARY KEY,
+    insider_id TEXT,
+    normalized_name TEXT NOT NULL,
+    entity_type TEXT NOT NULL,
+    is_fund_like BOOLEAN NOT NULL,
+    source TEXT NOT NULL,
+    confidence DOUBLE PRECISION DEFAULT 1.0,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE UNIQUE INDEX uq_insider_entities_normalized_name
+    ON public.insider_entities (normalized_name);

@@ -29,6 +29,11 @@ from src.analytics.cluster_buys import get_top_cluster_buys
 
 
 def format_rows(rows: List[Any]) -> None:
+    has_total_insiders = any("num_total_insiders" in row for row in rows)
+    has_fund_list = any(row.get("fund_like_insiders") for row in rows)
+    has_role_score = any("role_score" in row for row in rows)
+    has_key_roles = any(row.get("key_roles") for row in rows)
+    has_cluster_score = any("cluster_score" in row for row in rows)
     if Console and Table:
         console = Console()
         table = Table(show_header=True, header_style="bold cyan", box=box.MARKDOWN)
@@ -36,12 +41,26 @@ def format_rows(rows: List[Any]) -> None:
             ("ticker", "Ticker", "left"),
             ("window_start", "Start", "center"),
             ("window_end", "End", "center"),
-            ("num_insiders", "Insiders", "right"),
+            ("num_insiders", "People", "right"),
+        ]
+        if has_total_insiders:
+            columns.append(("num_total_insiders", "All", "right"))
+        if has_role_score:
+            columns.append(("role_score", "RoleScore", "right"))
+        if has_cluster_score:
+            columns.append(("cluster_score", "ClusterScore", "right"))
+        columns.extend(
+            [
             ("num_trades", "Trades", "right"),
             ("total_value", "Total Value", "right"),
             ("total_shares", "Shares", "right"),
             ("top_insiders", "Insiders", "left"),
-        ]
+            ]
+        )
+        if has_key_roles:
+            columns.append(("key_roles", "Key Roles", "left"))
+        if has_fund_list:
+            columns.append(("fund_like_insiders", "Funds", "left"))
         for _, title, justify in columns:
             table.add_column(title, justify=justify)
         for row in rows:
@@ -50,10 +69,15 @@ def format_rows(rows: List[Any]) -> None:
                 str(row.get("window_start", "")),
                 str(row.get("window_end", "")),
                 f"{int(row.get('num_insiders', 0)):,}",
+                *( [f"{int(row.get('num_total_insiders', 0)):,}"] if has_total_insiders else [] ),
+                *( [f"{int(row.get('role_score', 0)):,}"] if has_role_score else [] ),
+                *( [f"{float(row.get('cluster_score', 0.0)):.1f}"] if has_cluster_score else [] ),
                 f"{int(row.get('num_trades', 0)):,}",
                 f"${float(row.get('total_value', 0.0)):,.0f}",
                 f"{float(row.get('total_shares', 0.0)):,.0f}",
                 row.get("top_insiders", "") or "—",
+                *( [row.get("key_roles", "") or "—"] if has_key_roles else [] ),
+                *( [row.get("fund_like_insiders", "") or "—"] if has_fund_list else [] ),
             )
         console.print(table)
     elif tabulate:
@@ -67,14 +91,23 @@ def format_rows(rows: List[Any]) -> None:
         )
     else:
         for row in rows:
-            print(
-                f"{row['ticker']:5} "
-                f"{row['window_start']}–{row['window_end']}  "
-                f"insiders={row['num_insiders']:2d}  "
-                f"trades={row['num_trades']:3d}  "
-                f"value=${row['total_value']:,.0f}  "
-                f"top={row['top_insiders']}"
-            )
+            parts = [
+                f"{row.get('ticker',''):5}",
+                f"{row.get('window_start','')}–{row.get('window_end','')}",
+                f"people={int(row.get('num_insiders', 0)):2d}",
+                f"trades={int(row.get('num_trades', 0)):3d}",
+                f"value=${float(row.get('total_value', 0.0)):,.0f}",
+                f"top={row.get('top_insiders','') or '—'}",
+            ]
+            if has_role_score:
+                parts.insert(3, f"role_score={int(row.get('role_score', 0)):2d}")
+            if has_cluster_score:
+                parts.insert(4, f"cluster_score={float(row.get('cluster_score', 0.0)):.1f}")
+            if has_key_roles:
+                parts.append(f"key_roles={row.get('key_roles','') or '—'}")
+            if has_fund_list:
+                parts.append(f"funds={row.get('fund_like_insiders','') or '—'}")
+            print("  ".join(parts))
 
 
 def main() -> None:
@@ -86,6 +119,20 @@ def main() -> None:
     parser.add_argument("--min-trade-value", type=float, default=0, help="Minimum per-trade value")
     parser.add_argument("--ticker", type=str, default=None, help="Optional ticker filter")
     parser.add_argument("--limit", type=int, default=20, help="Number of rows to display")
+    parser.add_argument("--min-role-score", type=int, default=0, help="Minimum RoleScore filter")
+    parser.add_argument("--min-people", type=int, default=None, help="Minimum people insiders filter")
+    parser.add_argument(
+        "--max-fund-ratio",
+        type=float,
+        default=None,
+        help="Maximum Funds/All ratio (e.g., 0.5 keeps clusters with <=50% funds)",
+    )
+    parser.add_argument(
+        "--min-cluster-score",
+        type=float,
+        default=None,
+        help="Minimum composite ClusterScore (higher is better)",
+    )
     parser.add_argument(
         "--no-exclusions",
         action="store_true",
@@ -102,6 +149,10 @@ def main() -> None:
         min_trade_value=args.min_trade_value,
         ticker=args.ticker,
         use_exclusions=not args.no_exclusions,
+        min_role_score=args.min_role_score,
+        min_people=args.min_people,
+        max_fund_ratio=args.max_fund_ratio,
+        min_cluster_score=args.min_cluster_score,
     )
 
     if df.empty:

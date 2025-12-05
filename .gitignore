@@ -79,7 +79,7 @@ dmypy.json
 
 # Data files - large archives and extracted data
 data/*
-docs/*
+# docs/*
 
 
 # Database files

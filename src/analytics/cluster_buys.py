@@ -2,13 +2,17 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date, timedelta
-from typing import Optional
+from typing import Any, Dict, Optional
 
 import pandas as pd
-from sqlalchemy import create_engine, text
+from sqlalchemy import text
 from sqlalchemy.engine import Engine
+from sqlalchemy.orm import Session
 
-from src.config import DATABASE_URL
+from src.config import DATABASE_URL, get_engine
+from src.cluster_scoring import compute_cluster_score
+from src.insider_classification import get_or_create_insider_entity, normalize_insider_name
+from src.insider_roles import compute_insider_role_weight
 
 
 def _first_nonempty(series: pd.Series) -> str:
@@ -39,6 +43,72 @@ def _format_insider_label(
     return f"{name} ({descriptor})" if descriptor else name
 
 
+def _flag_value(value: object) -> bool:
+    """
+    Normalize truthy values that may arrive as strings/ints/bools.
+    """
+    if isinstance(value, bool):
+        return value
+    if value is None:
+        return False
+    try:
+        if pd.isna(value):
+            return False
+    except Exception:
+        pass
+    if isinstance(value, (int, float)):
+        return bool(value)
+    return str(value).strip().lower() in {"1", "true", "t", "yes", "y"}
+
+
+def _derive_flags(row: pd.Series) -> Dict[str, bool]:
+    """
+    Derive insider flags from row metadata.
+    """
+    relationship = str(row.get("insider_relationship", "") or "").lower()
+    return {
+        "is_director": _flag_value(row.get("is_director")) or "director" in relationship,
+        "is_officer": _flag_value(row.get("is_officer")) or "officer" in relationship,
+        "is_ten_percent_owner": _flag_value(row.get("is_ten_percent_owner"))
+        or "ten percent" in relationship
+        or "10%" in relationship,
+        "is_other": _flag_value(row.get("is_other")) or "other" in relationship,
+    }
+
+
+def _classify_insiders(base_df: pd.DataFrame, engine: Engine) -> Dict[str, Dict[str, Any]]:
+    """
+    Ensure each normalized insider name has a cached classification in the DB.
+    Returns a map of normalized_name -> InsiderEntity.
+    """
+    if base_df.empty or "normalized_name" not in base_df:
+        return {}
+
+    unique_rows = base_df.drop_duplicates(subset=["normalized_name"])
+    classifications: Dict[str, Dict[str, Any]] = {}
+    with Session(bind=engine, expire_on_commit=False) as session:
+        for _, row in unique_rows.iterrows():
+            normalized = row.get("normalized_name") or ""
+            if not normalized:
+                continue
+            flags = _derive_flags(row)
+            insider_id = None
+            if "insider_cik" in row and pd.notna(row.get("insider_cik")):
+                insider_id = str(row.get("insider_cik"))
+            entity = get_or_create_insider_entity(
+                session=session,
+                insider_name=row.get("insider_name", normalized),
+                officer_title=row.get("insider_title"),
+                flags=flags,
+                insider_id=insider_id,
+            )
+            classifications[normalized] = {
+                "is_fund_like": bool(entity.is_fund_like),
+                "entity_type": entity.entity_type,
+            }
+    return classifications
+
+
 @dataclass
 class ClusterBuyEvent:
     ticker: str
@@ -55,7 +125,7 @@ def _get_engine() -> Engine:
     if not DATABASE_URL:
         raise RuntimeError("DATABASE_URL is not set; configure it in .env")
     try:
-        return create_engine(DATABASE_URL)
+        return get_engine()
     except Exception as exc:  # pragma: no cover - passthrough for clarity
         raise RuntimeError(f"Failed to create engine for DATABASE_URL: {exc}") from exc
 
@@ -78,6 +148,10 @@ def find_cluster_buys(
     min_trade_value: float = 0.0,
     ticker: Optional[str] = None,
     use_exclusions: bool = True,
+    min_role_score: int = 0,
+    min_people: Optional[int] = None,
+    max_fund_ratio: Optional[float] = None,
+    min_cluster_score: Optional[float] = None,
 ) -> pd.DataFrame:
     latest_date = get_latest_filing_date()
     start_date = latest_date - timedelta(days=lookback_days)
@@ -246,11 +320,34 @@ def find_cluster_buys(
     base_df["transaction_date"] = pd.to_datetime(base_df["transaction_date"]).dt.date
     base_df["shares"] = pd.to_numeric(base_df["shares"], errors="coerce").fillna(0.0)
     base_df["total_value"] = pd.to_numeric(base_df["total_value"], errors="coerce").fillna(0.0)
+    if "insider_name" not in base_df.columns:
+        base_df["insider_name"] = ""
+    else:
+        base_df["insider_name"] = base_df["insider_name"].fillna("").astype(str)
     for col in ("insider_relationship", "insider_title"):
         if col not in base_df.columns:
             base_df[col] = ""
         else:
             base_df[col] = base_df[col].fillna("").astype(str)
+    base_df["normalized_name"] = base_df["insider_name"].fillna("").astype(str).map(normalize_insider_name)
+    flags_df = base_df.apply(_derive_flags, axis=1, result_type="expand")
+    for flag_col in ("is_director", "is_officer", "is_ten_percent_owner", "is_other"):
+        if flag_col in flags_df:
+            base_df[flag_col] = flags_df[flag_col].fillna(False).astype(bool)
+        elif flag_col not in base_df.columns:
+            base_df[flag_col] = False
+
+    classifications = _classify_insiders(base_df, engine)
+    if classifications:
+        base_df["is_fund_like"] = base_df["normalized_name"].map(
+            lambda n: bool(classifications[n]["is_fund_like"]) if n in classifications else False
+        )
+        base_df["entity_type"] = base_df["normalized_name"].map(
+            lambda n: classifications[n]["entity_type"] if n in classifications else ""
+        )
+    else:
+        base_df["is_fund_like"] = False
+        base_df["entity_type"] = ""
 
     merged_records = []
     for ticker_value, tdf in df.groupby("ticker"):
@@ -274,21 +371,72 @@ def find_cluster_buys(
             if subset.empty:
                 continue
             num_trades = len(subset)
-            num_insiders = subset["insider_name"].nunique()
             total_shares = subset["shares"].sum()
             total_value = subset["total_value"].sum()
             grouped = (
-                subset.groupby("insider_name")
+                subset.groupby("normalized_name")
                 .agg(
+                    insider_name=("insider_name", _first_nonempty),
                     total_value=("total_value", "sum"),
                     relationship=("insider_relationship", _first_nonempty),
                     title=("insider_title", _first_nonempty),
+                    is_fund_like=("is_fund_like", "max"),
+                    is_director=("is_director", "max"),
+                    is_officer=("is_officer", "max"),
                 )
                 .sort_values("total_value", ascending=False)
             )
-            top_insiders = ", ".join(
-                _format_insider_label(name, row.get("relationship"), row.get("title"))
-                for name, row in grouped.iterrows()
+            people: list[str] = []
+            fund_like_labels: list[str] = []
+            role_score = 0
+            num_key_officers = 0
+            has_cfo = False
+            has_gc = False
+            has_ceo = False
+            for _, row in grouped.iterrows():
+                label = _format_insider_label(
+                    row.get("insider_name") or "",
+                    row.get("relationship"),
+                    row.get("title"),
+                )
+                if row.get("is_fund_like"):
+                    fund_like_labels.append(label)
+                else:
+                    people.append(label)
+                    weight = compute_insider_role_weight(
+                        officer_title=row.get("title"),
+                        is_director=bool(row.get("is_director")),
+                        is_officer=bool(row.get("is_officer")),
+                    )
+                    role_score += weight
+                    if weight >= 3:
+                        num_key_officers += 1
+                    title_u = str(row.get("title") or "").upper()
+                    if "CFO" in title_u or "CHIEF FINANCIAL OFFICER" in title_u:
+                        has_cfo = True
+                    if "GENERAL COUNSEL" in title_u or "CHIEF LEGAL OFFICER" in title_u:
+                        has_gc = True
+                    if "CEO" in title_u or "CHIEF EXECUTIVE OFFICER" in title_u:
+                        has_ceo = True
+
+            num_people = len(people)
+            num_fund_like = len(fund_like_labels)
+            total_unique_insiders = len(grouped.index)
+            top_insiders = ", ".join(people)
+            fund_like_insiders = ", ".join(fund_like_labels)
+            key_roles = []
+            if has_cfo:
+                key_roles.append("CFO")
+            if has_gc:
+                key_roles.append("GC")
+            if has_ceo:
+                key_roles.append("CEO")
+            cluster_score = compute_cluster_score(
+                people=num_people,
+                role_score=role_score,
+                total_value_usd=total_value,
+                funds=num_fund_like,
+                all_insiders=total_unique_insiders,
             )
             merged_records.append(
                 {
@@ -296,10 +444,20 @@ def find_cluster_buys(
                     "window_start": start,
                     "window_end": end,
                     "num_trades": int(num_trades),
-                    "num_insiders": int(num_insiders),
+                    "num_insiders": int(num_people),
+                    "num_total_insiders": int(total_unique_insiders),
+                    "num_fund_like": int(num_fund_like),
                     "total_shares": float(total_shares),
                     "total_value": float(total_value),
                     "top_insiders": top_insiders,
+                    "fund_like_insiders": fund_like_insiders,
+                    "role_score": int(role_score),
+                    "num_key_officers": int(num_key_officers),
+                    "has_cfo": has_cfo,
+                    "has_gc": has_gc,
+                    "has_ceo": has_ceo,
+                    "key_roles": ", ".join(key_roles),
+                    "cluster_score": float(cluster_score),
                 }
             )
 
@@ -307,7 +465,22 @@ def find_cluster_buys(
         return pd.DataFrame(columns=df.columns)
 
     merged_df = pd.DataFrame(merged_records)
-    merged_df = merged_df.sort_values("total_value", ascending=False).reset_index(drop=True)
+    if min_insiders:
+        merged_df = merged_df[merged_df["num_insiders"] >= min_insiders]
+    if min_people is not None:
+        merged_df = merged_df[merged_df["num_insiders"] >= min_people]
+    if min_role_score is not None:
+        merged_df = merged_df[merged_df["role_score"] >= min_role_score]
+    if min_cluster_score is not None:
+        merged_df = merged_df[merged_df["cluster_score"] >= min_cluster_score]
+    if max_fund_ratio is not None:
+        denom = merged_df["num_total_insiders"].replace(0, 1)
+        merged_df = merged_df[(merged_df["num_fund_like"] / denom) <= max_fund_ratio]
+
+    merged_df = merged_df.sort_values(
+        by=["cluster_score", "role_score", "num_insiders", "total_value", "num_fund_like"],
+        ascending=[False, False, False, False, True],
+    ).reset_index(drop=True)
     return merged_df
 
 
@@ -324,4 +497,4 @@ def get_top_cluster_buys(
     df = find_cluster_buys(**kwargs)
     if df.empty:
         return df
-    return df.sort_values("total_value", ascending=False).head(limit).reset_index(drop=True)
+    return df.head(limit).reset_index(drop=True)
