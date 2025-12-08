@@ -9,6 +9,8 @@ target table, defaulting to `form345_raw`.
 from __future__ import annotations
 
 import pathlib
+import io
+import csv
 from typing import Iterable, Optional
 
 import pandas as pd
@@ -32,14 +34,45 @@ def discover_tsvs(path: pathlib.Path) -> Iterable[pathlib.Path]:
 
 def load_file(file_path: pathlib.Path, engine: Engine, table: str = DEFAULT_TABLE) -> int:
     """
-    Load a single TSV file into the specified Postgres table.
+    Load a single TSV file into the specified Postgres table using the efficient COPY command.
 
     Returns the number of rows written.
     """
+    # Read using pandas for robust parsing
     df = pd.read_csv(file_path, sep="\t", dtype=str)
-    # Normalize column names for consistency with SQL identifiers.
-    df.columns = [col.strip().lower() for col in df.columns]
-    df.to_sql(table, engine, if_exists="append", index=False, method="multi")
+    
+    # Normalize column names: strip whitespace and uppercase to match schema
+    df.columns = [col.strip().upper() for col in df.columns]
+
+    # Convert to CSV buffer for COPY
+    output = io.StringIO()
+    df.to_csv(
+        output, 
+        sep="\t", 
+        header=False, 
+        index=False, 
+        quoting=csv.QUOTE_MINIMAL,
+        escapechar="\\"
+    )
+    output.seek(0)
+
+    # Construct columns string for the COPY command
+    # We quote columns to ensure case sensitivity is respected if needed, 
+    # though standard SQL is case-insensitive, the schema defined quoted identifiers.
+    columns = ",".join([f'"{c}"' for c in df.columns])
+
+    sql = f"COPY public.{table} ({columns}) FROM STDIN WITH (FORMAT CSV, DELIMITER E'\\t', NULL '')"
+
+    # Execute COPY using a raw psycopg2 cursor
+    # SQLAlchemy 1.4/2.0+ engine.raw_connection() returns a pool-proxied DBAPI connection
+    with engine.connect() as conn:
+        # We need to access the underlying psycopg2 connection
+        # usage might vary by sqlalchemy version, but this is generally safe for psycopg2
+        dbapi_conn = conn.connection
+        with dbapi_conn.cursor() as cur:
+            cur.copy_expert(sql, output)
+        dbapi_conn.commit()
+
     return len(df.index)
 
 
