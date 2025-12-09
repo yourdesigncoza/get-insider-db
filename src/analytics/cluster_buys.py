@@ -13,6 +13,7 @@ from src.config import DATABASE_URL, get_engine
 from src.cluster_scoring import compute_cluster_score
 from src.insider_classification import get_or_create_insider_entity, normalize_insider_name
 from src.insider_roles import compute_insider_role_weight
+from src.analytics.feature_engineering import calculate_days_to_file, calculate_sale_to_purchase_ratio
 
 
 def _first_nonempty(series: pd.Series) -> str:
@@ -300,11 +301,13 @@ def find_cluster_buys(
             ticker,
             transaction_date,
             accession_number,
+            filing_date,
             insider_name,
             insider_relationship,
             insider_title,
             shares,
             total_value,
+            transaction_code,
             shares_owned_after
         FROM insider_buy_signals
         WHERE transaction_date BETWEEN :start_date AND :end_date
@@ -320,7 +323,8 @@ def find_cluster_buys(
     if base_df.empty:
         return pd.DataFrame(columns=df.columns)
 
-    base_df["transaction_date"] = pd.to_datetime(base_df["transaction_date"]).dt.date
+    base_df["transaction_date"] = pd.to_datetime(base_df["transaction_date"])
+    base_df["filing_date"] = pd.to_datetime(base_df["filing_date"]) # Ensure filing_date is datetime for calculations
     base_df["shares"] = pd.to_numeric(base_df["shares"], errors="coerce").fillna(0.0)
     base_df["total_value"] = pd.to_numeric(base_df["total_value"], errors="coerce").fillna(0.0)
     base_df["shares_owned_after"] = pd.to_numeric(base_df["shares_owned_after"], errors="coerce").fillna(0.0)
@@ -337,6 +341,10 @@ def find_cluster_buys(
             base_df[col] = base_df[col].fillna("").astype(str)
 
     base_df["normalized_name"] = base_df["insider_name"].fillna("").astype(str).map(normalize_insider_name)
+
+    # Apply feature engineering functions
+    base_df = calculate_days_to_file(base_df)
+    base_df = calculate_sale_to_purchase_ratio(base_df, lookback_days=lookback_days)
 
     # Calculate percent change grouped by (accession_number, normalized_name)
     # This prevents counting each line item as a separate conviction event with varying bases.
@@ -408,8 +416,12 @@ def find_cluster_buys(
 
         ticker_rows = base_df[base_df["ticker"] == ticker_value]
         for start, end in merged_intervals:
+            # Convert start and end to pandas Timestamps for consistent comparison
+            start_ts = pd.Timestamp(start)
+            end_ts = pd.Timestamp(end)
+
             subset = ticker_rows[
-                (ticker_rows["transaction_date"] >= start) & (ticker_rows["transaction_date"] <= end)
+                (ticker_rows["transaction_date"] >= start_ts) & (ticker_rows["transaction_date"] <= end_ts)
             ]
             if subset.empty:
                 continue
@@ -417,6 +429,8 @@ def find_cluster_buys(
             total_shares = subset["shares"].sum()
             total_value = subset["total_value"].sum()
             avg_percent_change = subset["percent_change_in_holdings"].mean() if not subset.empty else 0.0
+            avg_days_to_file = subset["days_to_file"].mean() if not subset.empty else 0.0
+            avg_sale_to_purchase_ratio = subset["sale_to_purchase_ratio"].mean() if not subset.empty else 0.0
             grouped = (
                 subset.groupby("normalized_name")
                 .agg(
@@ -482,6 +496,8 @@ def find_cluster_buys(
                 funds=num_fund_like,
                 all_insiders=total_unique_insiders,
                 avg_percent_change=avg_percent_change,
+                avg_days_to_file=avg_days_to_file,
+                avg_sale_to_purchase_ratio=avg_sale_to_purchase_ratio,
             )
             merged_records.append(
                 {
@@ -504,6 +520,8 @@ def find_cluster_buys(
                     "key_roles": ", ".join(key_roles),
                     "cluster_score": float(cluster_score),
                     "avg_percent_change": float(avg_percent_change),
+                    "avg_days_to_file": float(avg_days_to_file),
+                    "avg_sale_to_purchase_ratio": float(avg_sale_to_purchase_ratio),
                 }
             )
 

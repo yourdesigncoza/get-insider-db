@@ -14,6 +14,8 @@ def compute_cluster_score(
     funds: int,
     all_insiders: int,
     avg_percent_change: float,
+    avg_days_to_file: float,
+    avg_sale_to_purchase_ratio: float,
 ) -> float:
     """
     Compute a composite score for a cluster window.
@@ -24,6 +26,8 @@ def compute_cluster_score(
       - Larger total_value_usd is good (log scaled to reduce outlier dominance).
       - More funds relative to all_insiders is penalized.
       - Higher avg_percent_change is good (insiders increasing their stake significantly).
+      - Lower avg_days_to_file is good (faster filing suggests more conviction/urgency).
+      - Lower avg_sale_to_purchase_ratio is good (more purchases relative to sales).
     """
     all_insiders = max(int(all_insiders or 0), 1)
     people = int(people or 0)
@@ -31,6 +35,8 @@ def compute_cluster_score(
     funds = int(funds or 0)
     total_value_usd = float(total_value_usd or 0.0)
     avg_percent_change = float(avg_percent_change or 0.0)
+    avg_days_to_file = float(avg_days_to_file or 0.0)
+    avg_sale_to_purchase_ratio = float(avg_sale_to_purchase_ratio or 0.0)
 
     value_score = math.log10(total_value_usd + 1.0) if total_value_usd > 0 else 0.0
     fund_ratio = funds / all_insiders
@@ -39,7 +45,9 @@ def compute_cluster_score(
     w_people = 1.0
     w_value = 2.0
     w_fund = 2.0  # penalty
-    w_percent_change = 5.0 # New weight for average percent change
+    w_percent_change = 5.0
+    w_days_to_file = -0.5  # Penalty for more days to file
+    w_sale_to_purchase_ratio = -3.0 # Penalty for higher sale-to-purchase ratio
 
     score = (
         w_role * role_score
@@ -47,5 +55,7 @@ def compute_cluster_score(
         + w_value * value_score
         - w_fund * fund_ratio
         + w_percent_change * avg_percent_change
+        + w_days_to_file * avg_days_to_file
+        + w_sale_to_purchase_ratio * avg_sale_to_purchase_ratio
     )
     return score

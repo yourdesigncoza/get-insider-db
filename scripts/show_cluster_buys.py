@@ -35,6 +35,8 @@ def format_rows(rows: List[Any]) -> None:
     has_key_roles = any(row.get("key_roles") for row in rows)
     has_cluster_score = any("cluster_score" in row for row in rows)
     has_avg_percent_change = any("avg_percent_change" in row for row in rows)
+    has_avg_days_to_file = any("avg_days_to_file" in row for row in rows)
+    has_avg_sale_to_purchase_ratio = any("avg_sale_to_purchase_ratio" in row for row in rows)
     if Console and Table:
         console = Console()
         table = Table(show_header=True, header_style="bold cyan", box=box.MARKDOWN)
@@ -52,6 +54,10 @@ def format_rows(rows: List[Any]) -> None:
             columns.append(("cluster_score", "ClusterScore", "right"))
         if has_avg_percent_change:
             columns.append(("avg_percent_change", "Avg % Chg", "right"))
+        if has_avg_days_to_file:
+            columns.append(("avg_days_to_file", "Avg Days to File", "right"))
+        if has_avg_sale_to_purchase_ratio:
+            columns.append(("avg_sale_to_purchase_ratio", "Avg S/P Ratio", "right"))
         columns.extend(
             [
             ("num_trades", "Trades", "right"),
@@ -76,6 +82,8 @@ def format_rows(rows: List[Any]) -> None:
                 *( [f"{int(row.get('role_score', 0)):,}"] if has_role_score else [] ),
                 *( [f"{float(row.get('cluster_score', 0.0)):.1f}"] if has_cluster_score else [] ),
                 *( [f"{float(row.get('avg_percent_change', 0.0)):.1%}"] if has_avg_percent_change else [] ),
+                *( [f"{float(row.get('avg_days_to_file', 0.0)):.0f}"] if has_avg_days_to_file else [] ),
+                *( [f"{float(row.get('avg_sale_to_purchase_ratio', 0.0)):.1f}"] if has_avg_sale_to_purchase_ratio else [] ),
                 f"{int(row.get('num_trades', 0)):,}",
                 f"${float(row.get('total_value', 0.0)):,.0f}",
                 f"{float(row.get('total_shares', 0.0)):,.0f}",
@@ -109,6 +117,10 @@ def format_rows(rows: List[Any]) -> None:
                 parts.insert(4, f"cluster_score={float(row.get('cluster_score', 0.0)):.1f}")
             if has_avg_percent_change:
                 parts.insert(5, f"avg_pct_chg={float(row.get('avg_percent_change', 0.0)):.1%}")
+            if has_avg_days_to_file:
+                parts.insert(6, f"avg_days_to_file={float(row.get('avg_days_to_file', 0.0)):.0f}")
+            if has_avg_sale_to_purchase_ratio:
+                parts.insert(7, f"avg_s_p_ratio={float(row.get('avg_sale_to_purchase_ratio', 0.0)):.1f}")
             if has_key_roles:
                 parts.append(f"key_roles={row.get('key_roles','') or '—'}")
             if has_fund_list:
