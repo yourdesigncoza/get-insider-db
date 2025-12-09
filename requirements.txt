@@ -5,3 +5,5 @@ python-dotenv
 rich
 tabulate
 pytest
+huggingface_hub
+datasets

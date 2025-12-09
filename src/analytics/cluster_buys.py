@@ -209,6 +209,7 @@ def find_cluster_buys(
                     WHERE b2.ticker = b.ticker
                       AND b2.transaction_date BETWEEN b.transaction_date - INTERVAL '{window_interval} day' AND b.transaction_date
                 ) AS total_value,
+                b.shares_owned_after,
                 (
                     SELECT string_agg(
                         CASE
@@ -298,11 +299,13 @@ def find_cluster_buys(
         SELECT
             ticker,
             transaction_date,
+            accession_number,
             insider_name,
             insider_relationship,
             insider_title,
             shares,
-            total_value
+            total_value,
+            shares_owned_after
         FROM insider_buy_signals
         WHERE transaction_date BETWEEN :start_date AND :end_date
           AND ticker IS NOT NULL
@@ -320,16 +323,56 @@ def find_cluster_buys(
     base_df["transaction_date"] = pd.to_datetime(base_df["transaction_date"]).dt.date
     base_df["shares"] = pd.to_numeric(base_df["shares"], errors="coerce").fillna(0.0)
     base_df["total_value"] = pd.to_numeric(base_df["total_value"], errors="coerce").fillna(0.0)
+    base_df["shares_owned_after"] = pd.to_numeric(base_df["shares_owned_after"], errors="coerce").fillna(0.0)
+
+    # String cleanup and normalization first
     if "insider_name" not in base_df.columns:
         base_df["insider_name"] = ""
     else:
         base_df["insider_name"] = base_df["insider_name"].fillna("").astype(str)
-    for col in ("insider_relationship", "insider_title"):
+    for col in ("insider_relationship", "insider_title", "accession_number"):
         if col not in base_df.columns:
             base_df[col] = ""
         else:
             base_df[col] = base_df[col].fillna("").astype(str)
+
     base_df["normalized_name"] = base_df["insider_name"].fillna("").astype(str).map(normalize_insider_name)
+
+    # Calculate percent change grouped by (accession_number, normalized_name)
+    # This prevents counting each line item as a separate conviction event with varying bases.
+    # We treat the entire filing as one "Buy Event".
+    # Logic:
+    # 1. Total Bought in Filing = Sum(shares)
+    # 2. Total Held After Filing = Max(shares_owned_after) -- Best proxy for post-filing holdings
+    # 3. Prior Holdings = Total Held After - Total Bought
+    # 4. % Change = Total Bought / Prior Holdings
+
+    filing_stats = base_df.groupby(["accession_number", "normalized_name"]).agg(
+        filing_bought=("shares", "sum"),
+        filing_held_after=("shares_owned_after", "max")
+    ).reset_index()
+
+    filing_stats["filing_prior"] = filing_stats["filing_held_after"] - filing_stats["filing_bought"]
+
+    def calc_pct(row):
+        bought = row["filing_bought"]
+        prior = row["filing_prior"]
+        if prior > 0:
+            return bought / prior
+        elif bought > 0:
+            # Infinite increase (new position). Cap at 1.0 (100%) for scoring sanity.
+            return 1.0
+        return 0.0
+
+    filing_stats["percent_change_in_holdings"] = filing_stats.apply(calc_pct, axis=1)
+
+    # Merge back to base_df
+    base_df = base_df.merge(
+        filing_stats[["accession_number", "normalized_name", "percent_change_in_holdings"]],
+        on=["accession_number", "normalized_name"],
+        how="left"
+    )
+    base_df["percent_change_in_holdings"] = base_df["percent_change_in_holdings"].fillna(0.0)
     flags_df = base_df.apply(_derive_flags, axis=1, result_type="expand")
     for flag_col in ("is_director", "is_officer", "is_ten_percent_owner", "is_other"):
         if flag_col in flags_df:
@@ -373,6 +416,7 @@ def find_cluster_buys(
             num_trades = len(subset)
             total_shares = subset["shares"].sum()
             total_value = subset["total_value"].sum()
+            avg_percent_change = subset["percent_change_in_holdings"].mean() if not subset.empty else 0.0
             grouped = (
                 subset.groupby("normalized_name")
                 .agg(
@@ -437,6 +481,7 @@ def find_cluster_buys(
                 total_value_usd=total_value,
                 funds=num_fund_like,
                 all_insiders=total_unique_insiders,
+                avg_percent_change=avg_percent_change,
             )
             merged_records.append(
                 {
@@ -458,6 +503,7 @@ def find_cluster_buys(
                     "has_ceo": has_ceo,
                     "key_roles": ", ".join(key_roles),
                     "cluster_score": float(cluster_score),
+                    "avg_percent_change": float(avg_percent_change),
                 }
             )
 

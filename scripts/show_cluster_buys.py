@@ -34,6 +34,7 @@ def format_rows(rows: List[Any]) -> None:
     has_role_score = any("role_score" in row for row in rows)
     has_key_roles = any(row.get("key_roles") for row in rows)
     has_cluster_score = any("cluster_score" in row for row in rows)
+    has_avg_percent_change = any("avg_percent_change" in row for row in rows)
     if Console and Table:
         console = Console()
         table = Table(show_header=True, header_style="bold cyan", box=box.MARKDOWN)
@@ -49,6 +50,8 @@ def format_rows(rows: List[Any]) -> None:
             columns.append(("role_score", "RoleScore", "right"))
         if has_cluster_score:
             columns.append(("cluster_score", "ClusterScore", "right"))
+        if has_avg_percent_change:
+            columns.append(("avg_percent_change", "Avg % Chg", "right"))
         columns.extend(
             [
             ("num_trades", "Trades", "right"),
@@ -72,6 +75,7 @@ def format_rows(rows: List[Any]) -> None:
                 *( [f"{int(row.get('num_total_insiders', 0)):,}"] if has_total_insiders else [] ),
                 *( [f"{int(row.get('role_score', 0)):,}"] if has_role_score else [] ),
                 *( [f"{float(row.get('cluster_score', 0.0)):.1f}"] if has_cluster_score else [] ),
+                *( [f"{float(row.get('avg_percent_change', 0.0)):.1%}"] if has_avg_percent_change else [] ),
                 f"{int(row.get('num_trades', 0)):,}",
                 f"${float(row.get('total_value', 0.0)):,.0f}",
                 f"{float(row.get('total_shares', 0.0)):,.0f}",
@@ -103,6 +107,8 @@ def format_rows(rows: List[Any]) -> None:
                 parts.insert(3, f"role_score={int(row.get('role_score', 0)):2d}")
             if has_cluster_score:
                 parts.insert(4, f"cluster_score={float(row.get('cluster_score', 0.0)):.1f}")
+            if has_avg_percent_change:
+                parts.insert(5, f"avg_pct_chg={float(row.get('avg_percent_change', 0.0)):.1%}")
             if has_key_roles:
                 parts.append(f"key_roles={row.get('key_roles','') or '—'}")
             if has_fund_list:

@@ -212,6 +212,7 @@ CREATE OR REPLACE VIEW public.insider_buy_signals AS
     (NULLIF(t."TRANS_SHARES", ''::TEXT))::NUMERIC AS shares,
     (NULLIF(t."TRANS_PRICEPERSHARE", ''::TEXT))::NUMERIC AS price_per_share,
     ((NULLIF(t."TRANS_SHARES", ''::TEXT))::NUMERIC * (NULLIF(t."TRANS_PRICEPERSHARE", ''::TEXT))::NUMERIC) AS total_value,
+    (NULLIF(t."SHRS_OWND_FOLWNG_TRANS", ''::TEXT))::NUMERIC AS shares_owned_after,
     t."DIRECT_INDIRECT_OWNERSHIP" AS direct_indirect,
     t."NATURE_OF_OWNERSHIP" AS nature_of_ownership
    FROM ((public.form345_nonderiv_trans t
