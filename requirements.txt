@@ -7,3 +7,6 @@ tabulate
 pytest
 huggingface_hub
 datasets
+requests
+python-dateutil
+tenacity
