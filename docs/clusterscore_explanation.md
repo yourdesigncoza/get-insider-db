@@ -16,6 +16,10 @@ The **ClusterScore** is a single number—like a grade from 0 to 100—that tell
 
 **Here is how we calculate the grade (the ClusterScore):**
 
+We first calculate a **Raw Score** by adding (or subtracting) points, and then we **normalize** it to a 0-100 scale.
+
+**1. The Raw Score Calculation:**
+
 We start at **0** and add (or subtract) points:
 
 *   **+ Points for Popular Kids (Role Score):**
@@ -49,6 +53,19 @@ We start at **0** and add (or subtract) points:
 *   **- Penalty for Sellers (Sale/Purchase Ratio):**
     *   We **subtract** points if these insiders are frequent sellers.
     *   We look at their past trades. If they sold 10x more than they bought, we subtract points (weight: -3.0). We want insiders who are "pure buyers" or hold their shares.
+
+**2. The Final Score (Normalization):**
+
+Since the raw score could theoretically go very high (e.g., if everyone doubles their stake), we squash it into a **0 to 100** scale using a special curve.
+
+*   **Raw Score of 60** maps to **~60**. (This is our "passing grade" threshold).
+*   **Raw Score of 115** (a "Superstar" event) maps to **~83**.
+*   **Raw Score of 500** (an impossible outlier) maps to **~99.9**.
+
+The score **never exceeds 100**. This makes it easy to compare events:
+*   **60+:** Solid Buy Signal.
+*   **80+:** Exceptional Conviction.
+*   **90+:** Rare "All In" Event.
 
 **How it fits the Playbook:**
 

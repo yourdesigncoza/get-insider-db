@@ -49,7 +49,7 @@ def compute_cluster_score(
     w_days_to_file = -0.5  # Penalty for more days to file
     w_sale_to_purchase_ratio = -3.0 # Penalty for higher sale-to-purchase ratio
 
-    score = (
+    raw_score = (
         w_role * role_score
         + w_people * people
         + w_value * value_score
@@ -58,4 +58,16 @@ def compute_cluster_score(
         + w_days_to_file * avg_days_to_file
         + w_sale_to_purchase_ratio * avg_sale_to_purchase_ratio
     )
-    return score
+
+    # Normalize to 0-100 using an exponential saturation curve.
+    # We want a raw score of ~60 (the common filter cutoff) to map to roughly 60
+    # to preserve filter compatibility, while compressing high outliers (e.g. 100+)
+    # into the 80-100 range.
+    # Formula: f(x) = 100 * (1 - exp(-x / K))
+    # Solving 60 = 100 * (1 - exp(-60 / K)) yields K approx 65.
+    if raw_score <= 0:
+        return 0.0
+
+    k = 65.0
+    final_score = 100.0 * (1.0 - math.exp(-raw_score / k))
+    return final_score

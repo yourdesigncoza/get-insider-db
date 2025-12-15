@@ -92,27 +92,23 @@ def _get_price_history(ticker: str, start_date: datetime, end_date: datetime) ->
         print(f"Error fetching history for {ticker}: {e}", file=sys.stderr)
         return []
 
-def _calculate_max_drawdown(prices: List[float]) -> Optional[float]:
+def _calculate_max_drawdown(prices: List[float], base_price: float) -> Optional[float]:
     """
-    Calculate Maximum Drawdown (MDD) from a list of prices.
-    Returns the max drawdown as a percentage (e.g. -15.5 for 15.5% drop).
-    Returns None if list is empty.
+    Calculate Maximum Drawdown relative to the initial price (base_price).
+    It is the largest percentage drop below the base_price.
+    If prices never drop below base_price, returns 0.0.
     """
-    if not prices:
+    if not prices or base_price is None or base_price == 0:
         return None
         
-    peak = prices[0]
-    max_dd = 0.0
+    min_price = min(prices)
     
-    for p in prices:
-        if p > peak:
-            peak = p
+    if min_price >= base_price:
+        return 0.0
         
-        dd = (p - peak) / peak
-        if dd < max_dd:
-            max_dd = dd
-            
-    return round(max_dd * 100.0, 2)
+    # Calculate drop relative to base_price
+    drawdown = (min_price - base_price) / base_price
+    return round(drawdown * 100.0, 2)
 
 def _get_closest_price_record(history: List[Dict], target_date: datetime) -> Optional[Dict]:
     """Find the last price record on or before target_date."""
@@ -138,23 +134,24 @@ def enrich_row(row: Dict[str, Any]) -> Dict[str, Any]:
 
     try:
         window_end_date = datetime.strptime(window_end_str, "%Y-%m-%d")
+        trading_start_date = window_end_date + timedelta(days=1) # Initial price is the day AFTER window_end
     except ValueError:
         return row
 
-    # Define the horizons
+    # Define the horizons (these define the end of the observation periods, relative to original window_end)
     date_1m = window_end_date + relativedelta(months=1)
     date_2m = window_end_date + relativedelta(months=2)
     date_3m = window_end_date + relativedelta(months=3)
     
-    # Fetch all data in one go
-    # We fetch up to 3m out.
-    history = _get_price_history(ticker, window_end_date, date_3m)
+    # Fetch all data in one go, starting from the potential trading start date
+    # We fetch up to 3m out from window_end, but starting history from trading_start_date
+    history = _get_price_history(ticker, trading_start_date, date_3m)
     
     # Small delay to be polite
     time.sleep(0.1)
 
-    # 1. Base Price (at window_end)
-    base_record = _get_closest_price_record(history, window_end_date)
+    # 1. Base Price (at trading_start_date or first available thereafter)
+    base_record = _get_closest_price_record(history, trading_start_date)
     base_price = base_record['close'] if base_record else None
     
     results = {}
