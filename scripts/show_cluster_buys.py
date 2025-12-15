@@ -132,7 +132,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Show top insider cluster buy events")
     parser.add_argument("--window-days", type=int, default=10, help="Window size in days")
     parser.add_argument("--lookback-days", type=int, default=120, help="Lookback period in days")
-    parser.add_argument("--min-insiders", type=int, default=2, help="Minimum distinct insiders")
+    parser.add_argument("--min-insiders", type=int, default=3, help="Minimum distinct insiders")
     parser.add_argument("--min-total-value", type=float, default=0, help="Minimum total value")
     parser.add_argument("--min-trade-value", type=float, default=0, help="Minimum per-trade value")
     parser.add_argument("--ticker", type=str, default=None, help="Optional ticker filter")

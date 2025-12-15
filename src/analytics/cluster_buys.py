@@ -144,7 +144,7 @@ def get_latest_filing_date() -> date:
 def find_cluster_buys(
     window_days: int = 10,
     lookback_days: int = 90,
-    min_insiders: int = 2,
+    min_insiders: int = 3,
     min_total_value: float = 0.0,
     min_trade_value: float = 0.0,
     ticker: Optional[str] = None,
