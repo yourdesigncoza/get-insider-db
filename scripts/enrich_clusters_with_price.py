@@ -1,11 +1,11 @@
 #!/usr/bin/env python
 """
-Enrich cluster export JSON with historical price data from Tiingo.
+Enrich cluster export JSON with historical price data from Financial Datasets AI.
 Adds price at window_end, and 1, 2, 3 months forward, plus returns.
 Caches prices in local `market_prices` table to minimize API calls.
-Also fetches Market Cap to calculate Relative Conviction.
+Also fetches fundamentals (market cap, EV, PE, PB, PEG) from Financial Datasets AI
+and stores them in `market_fundamentals`.
 Uses concurrent.futures for parallel fetching.
-Includes yfinance fallback for Market Cap.
 """
 
 import argparse
@@ -21,7 +21,6 @@ from pathlib import Path
 from typing import Optional, Dict, Any, List
 
 import requests
-import yfinance as yf
 from dateutil.relativedelta import relativedelta
 from dotenv import load_dotenv
 from sqlalchemy import text
@@ -36,6 +35,9 @@ from src.config import get_engine
 load_dotenv()
 
 FINANCIAL_DATASETS_API_KEY = os.getenv("FINANCIAL_DATASETS_API_KEY")
+FINANCIAL_METRICS_PERIOD = os.getenv("FINANCIAL_METRICS_PERIOD", "quarterly")
+FUNDAMENTALS_MAX_LOOKBACK_DAYS = int(os.getenv("FUNDAMENTALS_MAX_LOOKBACK_DAYS", "730"))
+FUNDAMENTALS_MAX_FORWARD_DAYS = int(os.getenv("FUNDAMENTALS_MAX_FORWARD_DAYS", "120"))
 
 # Global Rate Limiting
 RATE_LIMIT_SECONDS = 0.0
@@ -215,33 +217,60 @@ def _get_price_history(ticker: str, start_date: datetime, end_date: datetime) ->
 # -------------------------------------------------------------------------
 
 def _fetch_fundamentals_from_db(ticker: str, target_date: datetime) -> Optional[Dict[str, Any]]:
-    """Fetch cached fundamentals for a specific date (or closest before)."""
+    """Fetch cached fundamentals for a specific date (closest to target_date)."""
     engine = get_engine()
-    start_search = target_date - timedelta(days=10)
+    # Financial metrics are typically periodic (quarterly/TTM), not daily.
+    # Search a wider window around the target date.
+    start_search = target_date - timedelta(days=FUNDAMENTALS_MAX_LOOKBACK_DAYS)
+    end_search = target_date + timedelta(days=FUNDAMENTALS_MAX_FORWARD_DAYS)
     
     with engine.connect() as conn:
-        row = conn.execute(text("""
-            SELECT date, market_cap, enterprise_value, pe_ratio, pb_ratio
+        rows = conn.execute(text("""
+            SELECT date, market_cap, enterprise_value, pe_ratio, pb_ratio, trailing_peg_ratio
             FROM market_fundamentals 
             WHERE ticker = :ticker 
-              AND date BETWEEN :start AND :target
+              AND date BETWEEN :start AND :end
             ORDER BY date DESC
-            LIMIT 1
+            LIMIT 40
         """), {
             "ticker": ticker,
             "start": start_search.date(),
-            "target": target_date.date()
-        }).fetchone()
+            "end": end_search.date(),
+        }).fetchall()
         
-    if row:
+    if rows:
+        candidates: List[Dict[str, Any]] = []
+        for row in rows:
+            candidates.append(
+                {
+                    "date": datetime.combine(row[0], datetime.min.time()),
+                    "marketCap": float(row[1]) if row[1] else None,
+                    "enterpriseVal": float(row[2]) if row[2] else None,
+                    "peRatio": float(row[3]) if row[3] else None,
+                    "pbRatio": float(row[4]) if row[4] else None,
+                    "trailingPegRatio": float(row[5]) if row[5] else None,
+                }
+            )
+
+        def _completeness_score(r: Dict[str, Any]) -> int:
+            return sum(
+                1
+                for k in ("marketCap", "enterpriseVal", "peRatio", "pbRatio", "trailingPegRatio")
+                if r.get(k) is not None
+            )
+
+        # Closest in absolute days; prefer <= target_date on ties; then more complete.
+        candidates.sort(
+            key=lambda r: (
+                abs((r["date"].date() - target_date.date()).days),
+                0 if r["date"].date() <= target_date.date() else 1,
+                -_completeness_score(r),
+                r["date"],
+            )
+        )
+        best = candidates[0]
         print(f"DEBUG: Found cached fundamentals for {ticker} from DB.", file=sys.stderr)
-        return {
-            "date": datetime.combine(row[0], datetime.min.time()),
-            "marketCap": float(row[1]) if row[1] else None,
-            "enterpriseVal": float(row[2]) if row[2] else None,
-            "peRatio": float(row[3]) if row[3] else None,
-            "pbRatio": float(row[4]) if row[4] else None
-        }
+        return best
     print(f"DEBUG: No cached fundamentals for {ticker} in DB.", file=sys.stderr)
     return None
 
@@ -255,9 +284,9 @@ def _save_fundamentals_to_db(ticker: str, data: List[Dict[str, Any]]):
         for d in data:
             conn.execute(text("""
                 INSERT INTO market_fundamentals (
-                    ticker, date, market_cap, enterprise_value, pe_ratio, pb_ratio
+                    ticker, date, market_cap, enterprise_value, pe_ratio, pb_ratio, trailing_peg_ratio
                 ) VALUES (
-                    :ticker, :date, :mc, :ev, :pe, :pb
+                    :ticker, :date, :mc, :ev, :pe, :pb, :peg
                 ) ON CONFLICT (ticker, date) DO NOTHING
             """), {
                 "ticker": ticker,
@@ -265,52 +294,11 @@ def _save_fundamentals_to_db(ticker: str, data: List[Dict[str, Any]]):
                 "mc": d.get("marketCap"),
                 "ev": d.get("enterpriseVal"),
                 "pe": d.get("peRatio"),
-                "pb": d.get("pbRatio")
+                "pb": d.get("pbRatio"),
+                "peg": d.get("trailingPegRatio"),
             })
 
-def _fetch_fundamentals_yfinance(ticker: str, price_at_date: Optional[float] = None) -> Optional[Dict[str, Any]]:
-    """
-    Fallback: fetch current shares outstanding from Yahoo Finance 
-    and calc Market Cap based on historical price.
-    """
-    try:
-        t = yf.Ticker(ticker)
-        # Suppress prints from yfinance (it can be chatty)
-        # Note: yfinance fetching is blocking and can be slow.
-        info = t.info
-        
-        shares = info.get("sharesOutstanding")
-        
-        if not shares:
-            # Try implied shares from MarketCap / Price?
-            curr_mcap = info.get("marketCap")
-            curr_price = info.get("currentPrice") or info.get("regularMarketPreviousClose")
-            if curr_mcap and curr_price:
-                shares = curr_mcap / curr_price
-        
-        if not shares:
-            return None
-            
-        # Calculate Historical Market Cap Proxy
-        # If we have the historical price, use it.
-        # If not, we can't really give a historical mcap, but we can return current as a worst-case fallback?
-        # No, better to be strict for "Backtest" logic, but lax for "Ranking".
-        
-        mcap = None
-        if price_at_date:
-            mcap = shares * price_at_date
-        else:
-            mcap = info.get("marketCap") # Fallback to current
-            
-        return {
-            "date": datetime.now(), # It's "current" metadata applied historically
-            "marketCap": mcap,
-            "enterpriseVal": info.get("enterpriseValue"),
-            "peRatio": info.get("trailingPE"),
-            "pbRatio": info.get("priceToBook")
-        }
-    except Exception:
-        return None
+
 
 def _parse_float(value: Any) -> Optional[float]:
     if value is None:
@@ -322,13 +310,96 @@ def _parse_float(value: Any) -> Optional[float]:
     except (ValueError, TypeError):
         return None
 
+def _parse_date(value: Any) -> Optional[datetime]:
+    if not value:
+        return None
+    if isinstance(value, datetime):
+        return value
+    if isinstance(value, str):
+        # Accept "YYYY-MM-DD" or ISO strings; take first 10 chars if present.
+        s = value[:10]
+        try:
+            return datetime.strptime(s, "%Y-%m-%d")
+        except ValueError:
+            return None
+    return None
+
+def _normalize_financial_metrics_record(record: Dict[str, Any], fallback_date: datetime) -> Dict[str, Any]:
+    # Support both snake_case (schema) and existing camelCase used elsewhere in this script.
+    mc = _parse_float(record.get("market_cap") if "market_cap" in record else record.get("marketCap"))
+    ev = _parse_float(
+        record.get("enterprise_value")
+        if "enterprise_value" in record
+        else record.get("enterpriseVal")
+    )
+    pe = _parse_float(
+        record.get("price_to_earnings_ratio")
+        if "price_to_earnings_ratio" in record
+        else record.get("pe_ratio", record.get("peRatio"))
+    )
+    pb = _parse_float(
+        record.get("price_to_book_ratio")
+        if "price_to_book_ratio" in record
+        else record.get("pb_ratio", record.get("pbRatio"))
+    )
+    peg = _parse_float(
+        record.get("peg_ratio")
+        if "peg_ratio" in record
+        else record.get("trailing_peg_ratio", record.get("trailingPegRatio"))
+    )
+
+    record_date = (
+        _parse_date(record.get("date"))
+        or _parse_date(record.get("report_period"))
+        or _parse_date(record.get("reportPeriod"))
+        or _parse_date(record.get("period_end_date"))
+        or _parse_date(record.get("periodEndDate"))
+        or fallback_date
+    )
+
+    return {
+        "date": record_date,
+        "marketCap": mc,
+        "enterpriseVal": ev,
+        "peRatio": pe,
+        "pbRatio": pb,
+        "trailingPegRatio": peg,
+    }
+
+def _fetch_financial_metrics_from_api(ticker: str, period: str, limit: int = 12) -> List[Dict[str, Any]]:
+    """
+    Fetch valuation/financial metrics from Financial Datasets AI.
+
+    The OpenAPI schema indicates an object response, but some deployments may return
+    a list payload. This parser supports both to be resilient.
+    """
+    url = "https://api.financialdatasets.ai/financial-metrics"
+    params = {"ticker": ticker, "period": period, "limit": limit}
+    response = _make_request(url, params=params)
+    payload = response.json()
+
+    if isinstance(payload, list):
+        return payload
+    if isinstance(payload, dict):
+        # Common wrappers we may see.
+        for key in ("financial_metrics", "metrics", "data"):
+            val = payload.get(key)
+            if isinstance(val, list):
+                return val
+            if isinstance(val, dict):
+                return [val]
+        # Schema-style object.
+        if "market_cap" in payload or "enterprise_value" in payload or "price_to_earnings_ratio" in payload:
+            return [payload]
+
+    return []
+
 def _get_fundamental_at_date(ticker: str, target_date: datetime, price_at_date: Optional[float] = None) -> Optional[Dict[str, Any]]:
     """
     Get fundamentals for a specific date.
     1. Check DB.
-    2. If missing, fetch window from Financial Datasets AI.
-    3. If that fails, try YFinance fallback.
-    4. Save & Return.
+    2. If missing, fetch from Financial Datasets AI financial metrics.
+    3. Save & Return.
     """
     try:
         # 1. Try DB
@@ -337,59 +408,76 @@ def _get_fundamental_at_date(ticker: str, target_date: datetime, price_at_date: 
             return cached
             
         # 2. Fetch from Financial Datasets AI
-        fetch_start = target_date - timedelta(days=10)
-        fetch_end = target_date 
-        
-        url = "https://api.financialdatasets.ai/company/facts"
-        params = {
-            'ticker': ticker
-        }
-        
-        data = None
-        api_failed = False
-        
-        try:
-            response = _make_request(url, params=params)
-            data = response.json()
-            # Response: {"company_facts": { "market_cap": 123... }}
-            if "company_facts" not in data:
-                 print(f"Financial Datasets API returned no valid company_facts for {ticker}: {data}", file=sys.stderr)
-                 api_failed = True
-                 data = None
-            else:
-                 data = data["company_facts"]
+        # We only care about the metric record closest to window_end (target_date), so:
+        # - fetch a small recent window from the API
+        # - choose the closest record <= target_date
+        # - store only that record in DB (avoid loading years of history)
+        limits_to_try = (12, 40)
+        records: List[Dict[str, Any]] = []
+        for lim in limits_to_try:
+            try:
+                records = _fetch_financial_metrics_from_api(ticker, FINANCIAL_METRICS_PERIOD, limit=lim)
+            except Exception as e:
+                print(f"Error fetching Financial Datasets AI financial metrics for {ticker}: {e}", file=sys.stderr)
+                records = []
 
-        except Exception as e:
-            print(f"Error fetching Financial Datasets API fundamentals for {ticker}: {e}", file=sys.stderr)
-            api_failed = True
-        
-        if not api_failed and data:
-            mc = _parse_float(data.get("market_cap"))
-            
-            pe = None
-            pb = None
+            if records:
+                break
 
-            cleaned_data = [{
-                "date": target_date, 
-                "marketCap": mc,
-                "enterpriseVal": None, 
-                "peRatio": pe,
-                "pbRatio": pb
-            }]
-                
-            _save_fundamentals_to_db(ticker, cleaned_data)
-            
-            return cleaned_data[0] if cleaned_data else None
+        if not records:
+            print(f"DEBUG: No fundamentals records returned for {ticker} from API.", file=sys.stderr)
+            return None
 
-        # 3. Fallback to YFinance
-        # Only if API failed or returned no data
-        yf_data = _fetch_fundamentals_yfinance(ticker, price_at_date)
-        if yf_data:
-            # We don't save YF data to DB as 'market_fundamentals' because it's a proxy/hybrid
-            # and might mess up the purity of the cache. We just return it.
-            # Or we could save it with a flag? For now, just return.
-            return yf_data
-            
+        normalized = [_normalize_financial_metrics_record(r, fallback_date=target_date) for r in records]
+
+        min_allowed_date = target_date - timedelta(days=FUNDAMENTALS_MAX_LOOKBACK_DAYS)
+        max_allowed_date = target_date + timedelta(days=FUNDAMENTALS_MAX_FORWARD_DAYS)
+        candidates: List[Dict[str, Any]] = []
+        for r in normalized:
+            if not (min_allowed_date <= r["date"] <= max_allowed_date):
+                continue
+            # Skip records with no useful values (API can return skeleton rows).
+            if all(
+                r.get(k) is None
+                for k in ("marketCap", "enterpriseVal", "peRatio", "pbRatio", "trailingPegRatio")
+            ):
+                continue
+            candidates.append(r)
+
+        if not candidates:
+            print(
+                f"DEBUG: Fundamentals returned but no usable record near window_end for {ticker} "
+                f"(window_end={target_date.date()}, lookback_days={FUNDAMENTALS_MAX_LOOKBACK_DAYS}, forward_days={FUNDAMENTALS_MAX_FORWARD_DAYS}).",
+                file=sys.stderr,
+            )
+            return None
+
+        def _completeness_score(r: Dict[str, Any]) -> int:
+            return sum(
+                1
+                for k in ("marketCap", "enterpriseVal", "peRatio", "pbRatio", "trailingPegRatio")
+                if r.get(k) is not None
+            )
+
+        # Closest in absolute days; prefer <= target_date on ties; then more complete.
+        candidates.sort(
+            key=lambda r: (
+                abs((r["date"].date() - target_date.date()).days),
+                0 if r["date"].date() <= target_date.date() else 1,
+                -_completeness_score(r),
+                r["date"],
+            )
+        )
+        best = candidates[0]
+        if best["date"].date() > target_date.date():
+            print(
+                f"DEBUG: Using next-period fundamentals for {ticker}: {best['date'].date()} (window_end={target_date.date()}).",
+                file=sys.stderr,
+            )
+
+        _save_fundamentals_to_db(ticker, [best])
+        return best
+
         return None
 
     except Exception as e:
@@ -498,23 +586,12 @@ def enrich_row(row: Dict[str, Any]) -> Dict[str, Any]:
         else:
             results[f"max_drawdown_{suffix}"] = None
 
-    # --- FUNDAMENTALS ENRICHMENT (Fallback Check) ---
-    if (not fund_data or fund_data.get("marketCap") is None) and base_price:
-        # Tiingo/DB failed or incomplete, but we have a price. Try YFinance now.
-        yf_fund = _fetch_fundamentals_yfinance(ticker, base_price)
-        # If YF returns data, we prefer it over the empty/partial Tiingo data
-        if yf_fund:
-            fund_data = yf_fund
-            # Save fallback data to DB to prevent re-fetching/errors on next run
-            # We map the current YF data to the window_end_date for caching purposes
-            try:
-                fund_data_to_save = fund_data.copy()
-                fund_data_to_save['date'] = window_end_date
-                _save_fundamentals_to_db(ticker, [fund_data_to_save])
-            except Exception as e:
-                print(f"Warning: Failed to save fallback fundamentals for {ticker}: {e}", file=sys.stderr)
 
     market_cap = fund_data.get("marketCap") if fund_data else None
+    enterprise_value = fund_data.get("enterpriseVal") if fund_data else None
+    pe_ratio = fund_data.get("peRatio") if fund_data else None
+    pb_ratio = fund_data.get("pbRatio") if fund_data else None
+    trailing_peg_ratio = fund_data.get("trailingPegRatio") if fund_data else None
     
     cluster_vs_mcap_pct = None
     if market_cap and total_value and market_cap > 0:
@@ -524,6 +601,10 @@ def enrich_row(row: Dict[str, Any]) -> Dict[str, Any]:
     new_row.update({
         "price_at_window_end": base_price,
         "market_cap_at_window_end": market_cap,
+        "enterprise_value_at_window_end": enterprise_value,
+        "pe_ratio_at_window_end": pe_ratio,
+        "pb_ratio_at_window_end": pb_ratio,
+        "trailing_peg_ratio_at_window_end": trailing_peg_ratio,
         "cluster_value_vs_mcap_pct": cluster_vs_mcap_pct,
         **results
     })
@@ -565,7 +646,7 @@ def main():
     global RATE_LIMIT_SECONDS
     parser = argparse.ArgumentParser(description="Enrich cluster JSON with Tiingo prices and fundamentals")
     parser.add_argument("file_path", type=str, help="Path to the JSON file to enrich")
-    parser.add_argument("--rate_limit", type=float, default=2.0, help="Minimum seconds between API calls (e.g. 2.0 for free tier)")
+    parser.add_argument("--rate_limit", type=float, default=1.0, help="Minimum seconds between API calls (e.g. 2.0 for free tier)")
     args = parser.parse_args()
 
     if args.rate_limit > 0:
