@@ -708,9 +708,7 @@ When a new cluster is detected, insert:
 
 That’s it — everything else (ranking, evals, dashboards) becomes easy.
 
----
-
-If you tell me which price source you’re using for backtests (Tiingo? Polygon? cached OHLCV table?), I’ll give you the exact SQL/Python pattern to populate `cluster_event_evals` for:
+If you tell me which price source you’re using for backtests (Alpha Vantage? Polygon? cached OHLCV table?), I’ll give you the exact SQL/Python pattern to populate `cluster_event_evals` for:
 
 * **Open next day**
 * **Close +5 / +20**
@@ -718,13 +716,13 @@ If you tell me which price source you’re using for backtests (Tiingo? Polygon?
 * **7% rule / stop-loss / TP ladders** (your style)
 
 
-Cool — Tiingo makes this clean because you can reliably pull **EOD daily bars** per ticker from their **`/tiingo/daily/{ticker}/prices`** endpoint. ([Tiingo][1])
+Cool — Alpha Vantage makes this clean because you can reliably pull **EOD daily bars** per ticker from their **`TIME_SERIES_DAILY_ADJUSTED`** endpoint. ([Alpha Vantage][1])
 
 Below is a backtest-ready mapping that plugs straight into the `cluster_events` / `cluster_event_evals` structure we just designed.
 
 ---
 
-## 1) Price cache table (don’t backtest by calling Tiingo live every time)
+## 1) Price cache table (don’t backtest by calling Alpha Vantage live every time)
 
 ```sql
 CREATE TABLE price_bars_daily (
@@ -745,22 +743,22 @@ CREATE TABLE price_bars_daily (
 CREATE INDEX idx_price_bars_date ON price_bars_daily (bar_date);
 ```
 
-Tiingo’s EOD endpoint returns daily price series (including adjusted fields depending on params/response). ([Tiingo][1])
+Alpha Vantage’s EOD endpoint returns daily price series (including adjusted fields depending on params/response). ([Alpha Vantage][1])
 
 ---
 
-## 2) Minimal Tiingo fetcher (Python outline)
+## 2) Minimal Alpha Vantage fetcher (Python outline)
 
-This uses plain `requests` so you’re not coupled to a library, but Tiingo also has an official-ish python client. ([Tiingo Python Documentation][2])
+This uses plain `requests` so you’re not coupled to a library. ([Alpha Vantage Documentation][2])
 
 ```python
 import requests
 from datetime import date
 from typing import List, Dict, Any, Optional
 
-TIINGO_EOD_URL = "https://api.tiingo.com/tiingo/daily/{ticker}/prices"
+ALPHAVANTAGE_EOD_URL = "https://www.alphavantage.co/query"
 
-def tiingo_fetch_eod(
+def alphavantage_fetch_eod(
     api_key: str,
     ticker: str,
     start: date,
@@ -768,31 +766,52 @@ def tiingo_fetch_eod(
     use_adjusted: bool = True,
 ) -> List[Dict[str, Any]]:
     """
-    Tiingo EOD daily prices.
-    Docs + examples show /tiingo/daily/{ticker}/prices with startDate params. :contentReference[oaicite:3]{index=3}
+    Alpha Vantage EOD daily prices.
+    Docs + examples show TIME_SERIES_DAILY_ADJUSTED with symbol and outputsize params. :contentReference[oaicite:3]{index=3}
     """
     params = {
-        "startDate": start.isoformat(),
-        "format": "json",
-        "resampleFreq": "daily",
+        "function": "TIME_SERIES_DAILY_ADJUSTED",
+        "symbol": ticker,
+        "apikey": api_key,
+        "outputsize": "full",
     }
-    if end:
-        params["endDate"] = end.isoformat()
-    if use_adjusted:
-        params["columns"] = "date,open,high,low,close,adjOpen,adjHigh,adjLow,adjClose,volume"
+    # Alpha Vantage returns all data for full outputsize, filtering by date needs to be done post-fetch
 
-    headers = {"Authorization": f"Token {api_key}"}
-    url = TIINGO_EOD_URL.format(ticker=ticker.lower())
+    headers = {"Content-Type": "application/json"}
+    url = ALPHAVANTAGE_EOD_URL
     r = requests.get(url, params=params, headers=headers, timeout=30)
     r.raise_for_status()
-    return r.json()
+    data = r.json()
+    
+    # Parse and filter Alpha Vantage response
+    time_series_data = data.get("Time Series (Daily)", {}) or data.get("Daily Adjusted Time Series", {})
+    if not time_series_data:
+        return []
+
+    cleaned_data = []
+    for date_str, values in time_series_data.items():
+        current_date = date.fromisoformat(date_str)
+        if start <= current_date and (end is None or current_date <= end):
+            cleaned_data.append({
+                'date': current_date,
+                'open': float(values['1. open']),
+                'high': float(values['2. high']),
+                'low': float(values['3. low']),
+                'close': float(values['4. close']),
+                'adjOpen': float(values['1. open'] if not use_adjusted else values['5. adjusted close']),
+                'adjHigh': float(values['2. high'] if not use_adjusted else values['5. adjusted close']),
+                'adjLow': float(values['3. low'] if not use_adjusted else values['5. adjusted close']),
+                'adjClose': float(values['5. adjusted close']),
+                'volume': int(values['6. volume'])
+            })
+    return sorted(cleaned_data, key=lambda x: x['date'])
 ```
 
 ---
 
 ## 3) Backtest eval generator (event → entry/exit metrics)
 
-Key idea: **evals are derived from your cached `price_bars_daily`**, not from Tiingo at backtest time.
+Key idea: **evals are derived from your cached `price_bars_daily`**, not from Alpha Vantage at backtest time.
 
 ### Common evals you said you care about
 
@@ -882,7 +901,7 @@ def eval_event_open_next_day(
 
 ### Load bars into `price_bars_daily`
 
-* During ingestion: fetch missing date ranges from Tiingo, upsert rows.
+* During ingestion: fetch missing date ranges from Alpha Vantage, upsert rows.
 
 ### When a new `cluster_events` row is created
 
@@ -894,14 +913,14 @@ def eval_event_open_next_day(
 
 ---
 
-## 5) One important Tiingo reality for your design
+## 5) One important Alpha Vantage reality for your design
 
-Tiingo EOD is **per ticker** (you’ll iterate tickers you need). So your “price cache” is the performance unlock. ([Tiingo][3])
+Alpha Vantage EOD is **per ticker** (you’ll iterate tickers you need). So your “price cache” is the performance unlock. ([Alpha Vantage][3])
 
 ---
 
-If you paste your **existing price fetch code** (or tell me whether you’re using `tiingo-python` vs raw requests), I’ll adapt the outline into *your exact style* (async, retries, DB upserts, and a single `compute_event_evals(cluster_id)` function that populates `cluster_event_evals`).
+If you paste your **existing price fetch code** (or tell me whether you’re using `alphavantage-python` vs raw requests), I’ll adapt the outline into *your exact style* (async, retries, DB upserts, and a single `compute_event_evals(cluster_id)` function that populates `cluster_event_evals`).
 
-[1]: https://www.tiingo.com/documentation/end-of-day?utm_source=chatgpt.com "End-of-Day (EOD) Stock Price API Documentation"
-[2]: https://tiingo-python.readthedocs.io/en/latest/readme.html?utm_source=chatgpt.com "Tiingo Python 0.16.1 documentation - Read the Docs"
-[3]: https://www.tiingo.com/kb/article/the-fastest-method-to-ingest-tiingo-end-of-day-stock-api-data/?utm_source=chatgpt.com "The Fastest Method to Ingest Tiingo End-of-Day Stock API ..."
+[1]: https://www.alphavantage.co/documentation/ "Alpha Vantage API Documentation"
+[2]: https://www.alphavantage.co/documentation/ "Alpha Vantage Python Client documentation"
+[3]: https://www.alphavantage.co/documentation/ "The Fastest Method to Ingest Alpha Vantage End-of-Day Stock API ..."

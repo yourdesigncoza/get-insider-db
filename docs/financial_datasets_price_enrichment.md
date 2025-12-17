@@ -1,22 +1,23 @@
-# Tiingo Price Enrichment and Max Drawdown Calculation
+# Financial Datasets AI Price Enrichment and Max Drawdown Calculation
 
-This document summarizes the functionality implemented in `scripts/enrich_clusters_with_price.py`, which enriches cluster analysis JSON output files with historical stock price data and performance metrics from the Tiingo End-of-Day API.
+This document summarizes the functionality implemented in `scripts/enrich_clusters_with_price.py`, which enriches cluster analysis JSON output files with historical stock price data and performance metrics from the Financial Datasets AI API.
 
 ## Objective
-To integrate Tiingo API to fetch end-of-day stock price data and enrich our cluster analysis JSON files with historical price performance metrics, specifically focusing on returns and maximum drawdown over 1, 2, and 3-month periods.
+To integrate the Financial Datasets AI API to fetch end-of-day stock price data and enrich our cluster analysis JSON files with historical price performance metrics, specifically focusing on returns and maximum drawdown over 1, 2, and 3-month periods.
 
 ## Implementation Details
 
 ### 1. API Setup and Dependencies
--   **API:** Tiingo End-of-Day API (documentation: [https://www.tiingo.com/documentation/end-of-day](https://www.tiingo.com/documentation/end-of-day))
--   **Authentication:** The Tiingo API key must be stored in a `.env` file as `TIINGO_API_KEY`.
+-   **API:** Financial Datasets AI (documentation: [https://docs.financialdatasets.ai/](https://docs.financialdatasets.ai/))
+-   **Authentication:** The API key must be stored in a `.env` file as `FINANCIAL_DATASETS_API_KEY`.
 -   **Dependencies:** The following Python libraries were added to `requirements.txt` and installed:
-    -   `requests`: For making HTTP requests to the Tiingo API.
+    -   `requests`: For making HTTP requests to the API.
     -   `python-dateutil`: For robust date calculations, especially `relativedelta` for month-wise additions.
     -   `tenacity`: To handle API rate limits and transient network issues with exponential backoff and retries.
 
 ### 2. Data Fetching Strategy
--   **Efficient History Retrieval:** Instead of making multiple individual API calls for specific dates, the script now fetches the entire required price history (from `window_end` up to 3 months forward) in a single API call per ticker.
+-   **Efficient History Retrieval:** The script fetches the required price history (from `window_end` up to 3 months forward) using the `prices/historical` endpoint.
+-   **Fundamentals:** Market capitalization is fetched using the `company/facts` endpoint.
 -   **Date Handling:** For any given target date, the script intelligently looks back up to 7 days to find the most recent trading day's closing price, effectively handling weekends and holidays.
 -   **Caching:** An `lru_cache` is applied to the price history fetching function (`_get_price_history`) to prevent redundant API calls for the same ticker and date range within a single script run.
 

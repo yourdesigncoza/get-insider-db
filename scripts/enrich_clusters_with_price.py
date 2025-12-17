@@ -14,6 +14,7 @@ import json
 import os
 import sys
 import time
+import threading
 from datetime import datetime, timedelta
 from functools import lru_cache
 from pathlib import Path
@@ -34,9 +35,14 @@ from src.config import get_engine
 # Load environment variables
 load_dotenv()
 
-TIINGO_API_KEY = os.getenv("TIINGO_API_KEY")
+FINANCIAL_DATASETS_API_KEY = os.getenv("FINANCIAL_DATASETS_API_KEY")
 
-class TiingoError(Exception):
+# Global Rate Limiting
+RATE_LIMIT_SECONDS = 0.0
+REQUEST_LOCK = threading.Lock()
+LAST_REQUEST_TIME = 0.0
+
+class AlphaVantageError(Exception):
     pass
 
 
@@ -45,12 +51,34 @@ class TiingoError(Exception):
     wait=wait_exponential(multiplier=1, min=1, max=5),
     retry=retry_if_exception_type(requests.exceptions.RequestException)
 )
-def _make_request(url, headers, params):
+def _make_request(url, params):
+    global LAST_REQUEST_TIME
+    
+    if RATE_LIMIT_SECONDS > 0:
+        with REQUEST_LOCK:
+            now = time.time()
+            elapsed = now - LAST_REQUEST_TIME
+            if elapsed < RATE_LIMIT_SECONDS:
+                sleep_time = RATE_LIMIT_SECONDS - elapsed
+                time.sleep(sleep_time)
+            LAST_REQUEST_TIME = time.time()
+            
+    headers = {
+        'X-API-KEY': FINANCIAL_DATASETS_API_KEY
+    }
+
     response = requests.get(url, headers=headers, params=params, timeout=10)
     if response.status_code == 429:
         print("Rate limit hit, retrying...", file=sys.stderr)
         response.raise_for_status() # Trigger retry
-    response.raise_for_status()
+    
+    try:
+        response.raise_for_status()
+    except requests.exceptions.HTTPError as e:
+        print(f"HTTP Error {response.status_code} for URL: {url}", file=sys.stderr)
+        print(f"Response: {response.text}", file=sys.stderr)
+        raise e
+        
     return response
 
 # -------------------------------------------------------------------------
@@ -72,6 +100,11 @@ def _fetch_prices_from_db(ticker: str, start_date: datetime, end_date: datetime)
             "start": start_date.date(),
             "end": end_date.date()
         }).fetchall()
+        
+    if rows: 
+        print(f"DEBUG: Found {len(rows)} cached prices for {ticker} from DB.", file=sys.stderr)
+    else:
+        print(f"DEBUG: No cached prices for {ticker} in DB.", file=sys.stderr)
         
     return [{"date": datetime.combine(row[0], datetime.min.time()), "close": float(row[1])} for row in rows]
 
@@ -98,11 +131,11 @@ def _get_price_history(ticker: str, start_date: datetime, end_date: datetime) ->
     """
     Fetch daily price history.
     1. Check DB.
-    2. Fetch missing from Tiingo.
+    2. Fetch missing from Financial Datasets AI.
     3. Save to DB.
     """
-    if not TIINGO_API_KEY:
-        raise ValueError("TIINGO_API_KEY not found in environment variables.")
+    if not FINANCIAL_DATASETS_API_KEY:
+        raise ValueError("FINANCIAL_DATASETS_API_KEY not found in environment variables.")
 
     try:
         # 1. Try DB
@@ -133,40 +166,44 @@ def _get_price_history(ticker: str, start_date: datetime, end_date: datetime) ->
         if not needs_fetch:
             return db_prices
 
-        # 2. Fetch from Tiingo
-        # fetch_start is already calculated above
+        # 2. Fetch from Financial Datasets AI
         
-        url = f"https://api.tiingo.com/tiingo/daily/{ticker}/prices"
-        headers = {
-            'Content-Type': 'application/json',
-            'Authorization': f'Token {TIINGO_API_KEY}'
-        }
+        url = "https://api.financialdatasets.ai/prices/"
         params = {
-            'startDate': fetch_start.strftime('%Y-%m-%d'),
-            'endDate': end_date.strftime('%Y-%m-%d'),
-            'columns': 'date,close'
+            'ticker': ticker,
+            'interval': 'day',
+            'interval_multiplier': 1,
+            'start_date': fetch_start.strftime("%Y-%m-%d"),
+            'end_date': end_date.strftime("%Y-%m-%d")
         }
 
-        response = _make_request(url, headers, params)
+        response = _make_request(url, params=params)
         data = response.json()
         
-        if not data:
+        time_series_data = data.get("prices", [])
+
+        if not time_series_data:
             return db_prices
-            
+
         cleaned_data = []
-        for record in data:
-            d_str = record['date'].rstrip('Z')
-            if '.' in d_str:
-                d_str = d_str.split('.')[0]
-            dt = datetime.strptime(d_str, "%Y-%m-%dT%H:%M:%S")
-            cleaned_data.append({
-                'date': dt,
-                'close': float(record['close'])
-            })
-            
+        for item in time_series_data:
+            # item = {"time": "2024-01-01T00:00:00Z", "close": 150.0, ...}
+            # Handle ISO format by taking first 10 chars
+            date_str = item["time"][:10]
+            dt = datetime.strptime(date_str, "%Y-%m-%d")
+            close_val = item.get('close')
+            if close_val is not None:
+                cleaned_data.append({
+                    'date': dt,
+                    'close': float(close_val)
+                })
+
+        # Filter data to the requested date range after fetching all
+        cleaned_data = [d for d in cleaned_data if fetch_start <= d['date'] <= end_date]
+
         # 3. Save to DB
         _save_prices_to_db(ticker, cleaned_data)
-        
+
         return sorted(cleaned_data, key=lambda x: x['date'])
 
     except Exception as e:
@@ -197,6 +234,7 @@ def _fetch_fundamentals_from_db(ticker: str, target_date: datetime) -> Optional[
         }).fetchone()
         
     if row:
+        print(f"DEBUG: Found cached fundamentals for {ticker} from DB.", file=sys.stderr)
         return {
             "date": datetime.combine(row[0], datetime.min.time()),
             "marketCap": float(row[1]) if row[1] else None,
@@ -204,6 +242,7 @@ def _fetch_fundamentals_from_db(ticker: str, target_date: datetime) -> Optional[
             "peRatio": float(row[3]) if row[3] else None,
             "pbRatio": float(row[4]) if row[4] else None
         }
+    print(f"DEBUG: No cached fundamentals for {ticker} in DB.", file=sys.stderr)
     return None
 
 def _save_fundamentals_to_db(ticker: str, data: List[Dict[str, Any]]):
@@ -273,12 +312,22 @@ def _fetch_fundamentals_yfinance(ticker: str, price_at_date: Optional[float] = N
     except Exception:
         return None
 
+def _parse_float(value: Any) -> Optional[float]:
+    if value is None:
+        return None
+    if isinstance(value, str) and value.lower() == "none":
+        return None
+    try:
+        return float(value)
+    except (ValueError, TypeError):
+        return None
+
 def _get_fundamental_at_date(ticker: str, target_date: datetime, price_at_date: Optional[float] = None) -> Optional[Dict[str, Any]]:
     """
     Get fundamentals for a specific date.
     1. Check DB.
-    2. If missing, fetch window from Tiingo.
-    3. If Tiingo fails, try YFinance fallback.
+    2. If missing, fetch window from Financial Datasets AI.
+    3. If that fails, try YFinance fallback.
     4. Save & Return.
     """
     try:
@@ -287,55 +336,53 @@ def _get_fundamental_at_date(ticker: str, target_date: datetime, price_at_date: 
         if cached:
             return cached
             
-        # 2. Fetch from Tiingo
+        # 2. Fetch from Financial Datasets AI
         fetch_start = target_date - timedelta(days=10)
         fetch_end = target_date 
         
-        url = f"https://api.tiingo.com/tiingo/fundamentals/{ticker}/daily"
-        headers = {
-            'Content-Type': 'application/json',
-            'Authorization': f'Token {TIINGO_API_KEY}'
-        }
+        url = "https://api.financialdatasets.ai/company/facts"
         params = {
-            'startDate': fetch_start.strftime('%Y-%m-%d'),
-            'endDate': fetch_end.strftime('%Y-%m-%d')
+            'ticker': ticker
         }
         
         data = None
-        tiingo_failed = False
+        api_failed = False
         
         try:
-            response = _make_request(url, headers, params)
+            response = _make_request(url, params=params)
             data = response.json()
-        except Exception:
-            tiingo_failed = True
+            # Response: {"company_facts": { "market_cap": 123... }}
+            if "company_facts" not in data:
+                 print(f"Financial Datasets API returned no valid company_facts for {ticker}: {data}", file=sys.stderr)
+                 api_failed = True
+                 data = None
+            else:
+                 data = data["company_facts"]
+
+        except Exception as e:
+            print(f"Error fetching Financial Datasets API fundamentals for {ticker}: {e}", file=sys.stderr)
+            api_failed = True
         
-        if not data:
-            tiingo_failed = True
+        if not api_failed and data:
+            mc = _parse_float(data.get("market_cap"))
             
-        if not tiingo_failed:
-            cleaned_data = []
-            for record in data:
-                d_str = record['date'].rstrip('Z')
-                if '.' in d_str:
-                    d_str = d_str.split('.')[0]
-                dt = datetime.strptime(d_str, "%Y-%m-%dT%H:%M:%S")
-                cleaned_data.append({
-                    "date": dt,
-                    "marketCap": record.get("marketCap"),
-                    "enterpriseVal": record.get("enterpriseVal"),
-                    "peRatio": record.get("peRatio"),
-                    "pbRatio": record.get("pbRatio")
-                })
+            pe = None
+            pb = None
+
+            cleaned_data = [{
+                "date": target_date, 
+                "marketCap": mc,
+                "enterpriseVal": None, 
+                "peRatio": pe,
+                "pbRatio": pb
+            }]
                 
-            # Save Tiingo data
             _save_fundamentals_to_db(ticker, cleaned_data)
             
-            cleaned_data.sort(key=lambda x: x['date'], reverse=True)
             return cleaned_data[0] if cleaned_data else None
 
         # 3. Fallback to YFinance
-        # Only if Tiingo failed or returned no data
+        # Only if API failed or returned no data
         yf_data = _fetch_fundamentals_yfinance(ticker, price_at_date)
         if yf_data:
             # We don't save YF data to DB as 'market_fundamentals' because it's a proxy/hybrid
@@ -397,7 +444,7 @@ def enrich_row(row: Dict[str, Any]) -> Dict[str, Any]:
     
     # We fetch prices FIRST because YFinance fallback might need the base price
     # So we can't fully parallelize the dependency chain if we want that robust fallback.
-    # But we can still fetch standard Tiingo fundamentals in parallel.
+    # But we can still fetch standard Alpha Vantage fundamentals in parallel.
     
     # Revised flow:
     # 1. Fetch Prices (Blocking or Async)
@@ -405,8 +452,8 @@ def enrich_row(row: Dict[str, Any]) -> Dict[str, Any]:
     # 3. Fetch Fundamentals (passing base price for YF fallback)
     
     # To keep parallel speed for the main API calls:
-    # We can fetch Tiingo Fundamentals in parallel with Prices.
-    # If Tiingo Funds fails, THEN we do YF (sequentially).
+    # We can fetch Alpha Vantage Fundamentals in parallel with Prices.
+    # If Alpha Vantage Funds fails, THEN we do YF (sequentially).
     
     with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
         future_prices = executor.submit(_get_price_history, ticker, trading_start_date, date_3m)
@@ -452,9 +499,20 @@ def enrich_row(row: Dict[str, Any]) -> Dict[str, Any]:
             results[f"max_drawdown_{suffix}"] = None
 
     # --- FUNDAMENTALS ENRICHMENT (Fallback Check) ---
-    if not fund_data and base_price:
-        # Tiingo failed, but we have a price. Try YFinance now.
-        fund_data = _fetch_fundamentals_yfinance(ticker, base_price)
+    if (not fund_data or fund_data.get("marketCap") is None) and base_price:
+        # Tiingo/DB failed or incomplete, but we have a price. Try YFinance now.
+        yf_fund = _fetch_fundamentals_yfinance(ticker, base_price)
+        # If YF returns data, we prefer it over the empty/partial Tiingo data
+        if yf_fund:
+            fund_data = yf_fund
+            # Save fallback data to DB to prevent re-fetching/errors on next run
+            # We map the current YF data to the window_end_date for caching purposes
+            try:
+                fund_data_to_save = fund_data.copy()
+                fund_data_to_save['date'] = window_end_date
+                _save_fundamentals_to_db(ticker, [fund_data_to_save])
+            except Exception as e:
+                print(f"Warning: Failed to save fallback fundamentals for {ticker}: {e}", file=sys.stderr)
 
     market_cap = fund_data.get("marketCap") if fund_data else None
     
@@ -504,12 +562,18 @@ def process_file(file_path: Path):
     print(f"Done! Enriched data written to: {output_path}")
 
 def main():
+    global RATE_LIMIT_SECONDS
     parser = argparse.ArgumentParser(description="Enrich cluster JSON with Tiingo prices and fundamentals")
     parser.add_argument("file_path", type=str, help="Path to the JSON file to enrich")
+    parser.add_argument("--rate_limit", type=float, default=2.0, help="Minimum seconds between API calls (e.g. 2.0 for free tier)")
     args = parser.parse_args()
 
-    if not TIINGO_API_KEY:
-        print("Error: TIINGO_API_KEY environment variable is not set. Please add it to your .env file.", file=sys.stderr)
+    if args.rate_limit > 0:
+        RATE_LIMIT_SECONDS = args.rate_limit
+        print(f"Rate limiting enabled: {RATE_LIMIT_SECONDS}s between calls.")
+
+    if not FINANCIAL_DATASETS_API_KEY:
+        print("Error: FINANCIAL_DATASETS_API_KEY environment variable is not set. Please add it to your .env file.", file=sys.stderr)
         sys.exit(1)
 
     process_file(Path(args.file_path))

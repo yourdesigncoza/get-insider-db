@@ -5,7 +5,7 @@ Pipeline for ingesting SEC Form 3/4/5 data, classifying insiders, detecting conv
 ## Project Overview
 - Loads raw SEC Form 345 TSVs into a relational database, normalizes transactions, and caches insider classifications.
 - Detects windows where multiple real insiders buy in unison, scores conviction using role weights and behavior features, and exports ranked clusters.
-- Optional Tiingo enrichment adds post-signal returns and drawdowns to evaluate results.
+- Optional Alpha Vantage enrichment adds post-signal returns and drawdowns to evaluate results.
 
 ## Architecture
 - **Data ingestion:** `scripts/load_form345_quarter.py` scans `data/extracted/*_form345` folders, ingests TSVs into the DB, and keeps a `loaded_to_db.txt` log to avoid reprocessing. `scripts/load_quarter.py` is a thin wrapper for ad-hoc loads.
@@ -19,7 +19,7 @@ Pipeline for ingesting SEC Form 3/4/5 data, classifying insiders, detecting conv
 - Rule-based insider classification and role weighting (CFO/GC/CEO > Director) to prioritize real operators over funds.
 - Sliding-window cluster buy detection with configurable insider counts, dollar thresholds, and fund exclusions.
 - Composite conviction scoring that blends role density, participation, ticket size, filing timeliness, and historical buy/sell behavior.
-- Tiingo integration to append price at window end, forward returns (1/2/3m), and max drawdown.
+- Alpha Vantage integration to append price at window end, forward returns (1/2/3m), and max drawdown.
 - Export scripts that persist top-ranked clusters to JSON for downstream analysis or dashboards.
 
 ## Analytics Logic
@@ -36,7 +36,7 @@ Pipeline for ingesting SEC Form 3/4/5 data, classifying insiders, detecting conv
    ```bash
    export DATABASE_URL=postgresql://user:pass@localhost:5432/insider_data
    export DATA_DIR=data/extracted          # optional; defaults to data/extracted
-   export TIINGO_API_KEY=your_key_here     # needed for price enrichment
+   export FINANCIAL_DATASETS_API_KEY=your_key_here     # needed for price enrichment
    ```
 3. **Initialize the database**
    ```bash
@@ -60,7 +60,7 @@ Pipeline for ingesting SEC Form 3/4/5 data, classifying insiders, detecting conv
      ```bash
      python scripts/export_top_clusters.py --limit 50
      ```
-6. **Enrich with Tiingo prices**
+6. **Enrich with Alpha Vantage prices**
    ```bash
    python scripts/enrich_clusters_with_price.py exports/cluster_runs/<export>.json
    ```

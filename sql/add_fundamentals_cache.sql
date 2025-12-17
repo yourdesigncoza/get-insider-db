@@ -1,4 +1,4 @@
--- market_fundamentals table for caching Tiingo Daily Fundamentals
+-- market_fundamentals table for caching Alpha Vantage Daily Fundamentals
 CREATE TABLE IF NOT EXISTS public.market_fundamentals (
     ticker TEXT NOT NULL,
     date DATE NOT NULL,

@@ -38,7 +38,7 @@ def rank_clusters(data: Dict[str, Any], min_mcap_millions: float = 50.0, min_con
             continue
             
         # Mcap Filter (e.g. > $50M)
-        # Tiingo mcap is usually in raw units (dollars), not millions.
+        # Alpha Vantage mcap is usually in raw units (dollars), not millions.
         # Let's assume raw dollars.
         if mcap < (min_mcap_millions * 1_000_000):
             skipped_small_cap += 1
@@ -69,7 +69,7 @@ def rank_clusters(data: Dict[str, Any], min_mcap_millions: float = 50.0, min_con
     
     # PRINT
     # Format: Ticker | Date | Score | Insiders | Total $ | MCap | % of Cap | 3m Rtn
-    header = f"{'TICKER':<6} | {'DATE':<10} | {'SCORE':<5} | {'INS':<3} | {'VALUE ($M)':<10} | {'MCAP ($M)':<10} | {'% MCAP':<8} | {'3M RTN':<8}"
+    header = f"{'TICKER':<6} | {'DATE':<10} | {'SCORE':<5} | {'INS':<3} | {'VALUE ($M)':<10} | {'MCAP ($M)':<10} | {'% MCAP':<8} | {'1M RTN':<8} | {'2M RTN':<8} | {'3M RTN':<8}"
     print(header)
     print("-" * len(header))
     
@@ -81,11 +81,15 @@ def rank_clusters(data: Dict[str, Any], min_mcap_millions: float = 50.0, min_con
         val_millions = round(q.get("total_value", 0) / 1_000_000, 2)
         mcap_millions = round(q.get("market_cap_at_window_end", 0) / 1_000_000, 0)
         pct_cap = q.get("cluster_value_vs_mcap_pct")
+        rtn_1m = q.get("return_1m")
+        rtn_2m = q.get("return_2m")
         rtn_3m = q.get("return_3m")
         
-        rtn_str = f"{rtn_3m}%" if rtn_3m is not None else "-"
+        rtn_1m_str = f"{rtn_1m}%" if rtn_1m is not None else "-"
+        rtn_2m_str = f"{rtn_2m}%" if rtn_2m is not None else "-"
+        rtn_3m_str = f"{rtn_3m}%" if rtn_3m is not None else "-"
         
-        print(f"{ticker:<6} | {date:<10} | {score:<5} | {ins:<3} | ${val_millions:<9} | ${mcap_millions:<9} | {pct_cap:<8} | {rtn_str:<8}")
+        print(f"{ticker:<6} | {date:<10} | {score:<5} | {ins:<3} | ${val_millions:<9} | ${mcap_millions:<9} | {pct_cap:<8} | {rtn_1m_str:<8} | {rtn_2m_str:<8} | {rtn_3m_str:<8}")
 
 def main():
     parser = argparse.ArgumentParser(description="Rank clusters by relative conviction")
