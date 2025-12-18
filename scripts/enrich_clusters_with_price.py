@@ -506,6 +506,12 @@ def _get_closest_price_record(history: List[Dict], target_date: datetime) -> Opt
             break
     return candidate
 
+def _get_first_price_record_on_or_after(history: List[Dict], target_date: datetime) -> Optional[Dict]:
+    for record in history:
+        if record["date"] >= target_date:
+            return record
+    return None
+
 def enrich_row(row: Dict[str, Any]) -> Dict[str, Any]:
     ticker = row.get("ticker")
     window_end_str = row.get("window_end")
@@ -516,13 +522,27 @@ def enrich_row(row: Dict[str, Any]) -> Dict[str, Any]:
 
     try:
         window_end_date = datetime.strptime(window_end_str, "%Y-%m-%d")
-        trading_start_date = window_end_date + timedelta(days=1)
     except ValueError:
         return row
 
-    date_1m = window_end_date + relativedelta(months=1)
-    date_2m = window_end_date + relativedelta(months=2)
-    date_3m = window_end_date + relativedelta(months=3)
+    # Lookahead-safe backtest anchor:
+    # - Prefer cluster_buys-provided entry_date (day after the last filing_date in the cluster).
+    # - Otherwise fall back to day after window_end.
+    entry_date_str = row.get("entry_date")
+    filing_date_str = row.get("signal_filing_date")
+    try:
+        if entry_date_str:
+            entry_date = datetime.strptime(entry_date_str, "%Y-%m-%d")
+        elif filing_date_str:
+            entry_date = datetime.strptime(filing_date_str, "%Y-%m-%d") + timedelta(days=1)
+        else:
+            entry_date = window_end_date + timedelta(days=1)
+    except ValueError:
+        entry_date = window_end_date + timedelta(days=1)
+
+    date_1m = entry_date + relativedelta(months=1)
+    date_2m = entry_date + relativedelta(months=2)
+    date_3m = entry_date + relativedelta(months=3)
     
     # ---------------------------------------------------------
     # PARALLEL FETCHING
@@ -544,10 +564,10 @@ def enrich_row(row: Dict[str, Any]) -> Dict[str, Any]:
     # If Alpha Vantage Funds fails, THEN we do YF (sequentially).
     
     with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
-        future_prices = executor.submit(_get_price_history, ticker, trading_start_date, date_3m)
+        future_prices = executor.submit(_get_price_history, ticker, entry_date, date_3m)
         # We don't pass price_at_date here yet, effectively disabling YF inside this parallel call if Tiingo fails
         # We will handle YF fallback explicitly after if needed.
-        future_fundamentals = executor.submit(_get_fundamental_at_date, ticker, window_end_date, None)
+        future_fundamentals = executor.submit(_get_fundamental_at_date, ticker, entry_date, None)
         
         try:
             history = future_prices.result()
@@ -560,13 +580,13 @@ def enrich_row(row: Dict[str, Any]) -> Dict[str, Any]:
             pass
 
     # --- PRICE ENRICHMENT ---
-    base_record = _get_closest_price_record(history, trading_start_date)
+    base_record = _get_first_price_record_on_or_after(history, entry_date)
     base_price = base_record['close'] if base_record else None
     
     results = {}
     
     for suffix, end_date in [("1m", date_1m), ("2m", date_2m), ("3m", date_3m)]:
-        end_record = _get_closest_price_record(history, end_date)
+        end_record = _get_first_price_record_on_or_after(history, end_date)
         end_price = end_record['close'] if end_record else None
         
         ret_val = None
@@ -599,6 +619,13 @@ def enrich_row(row: Dict[str, Any]) -> Dict[str, Any]:
 
     new_row = row.copy()
     new_row.update({
+        "price_at_entry": base_price,
+        "market_cap_at_entry": market_cap,
+        "enterprise_value_at_entry": enterprise_value,
+        "pe_ratio_at_entry": pe_ratio,
+        "pb_ratio_at_entry": pb_ratio,
+        "trailing_peg_ratio_at_entry": trailing_peg_ratio,
+        # Backward-compatible aliases (historically used for entry-next-day pricing).
         "price_at_window_end": base_price,
         "market_cap_at_window_end": market_cap,
         "enterprise_value_at_window_end": enterprise_value,

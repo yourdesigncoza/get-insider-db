@@ -7,6 +7,7 @@ import argparse
 import sys
 from pathlib import Path
 from typing import Any, List
+from datetime import datetime
 
 # Allow running the script directly without installing the package.
 ROOT = Path(__file__).resolve().parents[1]
@@ -34,6 +35,8 @@ def format_rows(rows: List[Any]) -> None:
     has_role_score = any("role_score" in row for row in rows)
     has_key_roles = any(row.get("key_roles") for row in rows)
     has_cluster_score = any("cluster_score" in row for row in rows)
+    has_signal_filing_date = any("signal_filing_date" in row for row in rows)
+    has_entry_date = any("entry_date" in row for row in rows)
     has_avg_percent_change = any("avg_percent_change" in row for row in rows)
     has_avg_days_to_file = any("avg_days_to_file" in row for row in rows)
     has_avg_sale_to_purchase_ratio = any("avg_sale_to_purchase_ratio" in row for row in rows)
@@ -44,8 +47,14 @@ def format_rows(rows: List[Any]) -> None:
             ("ticker", "Ticker", "left"),
             ("window_start", "Start", "center"),
             ("window_end", "End", "center"),
-            ("num_insiders", "People", "right"),
         ]
+        if has_signal_filing_date:
+            columns.append(("signal_filing_date", "Filed", "center"))
+        if has_entry_date:
+            columns.append(("entry_date", "Entry", "center"))
+        columns.extend([
+            ("num_insiders", "People", "right"),
+        ])
         if has_total_insiders:
             columns.append(("num_total_insiders", "All", "right"))
         if has_role_score:
@@ -77,6 +86,8 @@ def format_rows(rows: List[Any]) -> None:
                 str(row.get("ticker", "")),
                 str(row.get("window_start", "")),
                 str(row.get("window_end", "")),
+                *( [str(row.get("signal_filing_date", ""))] if has_signal_filing_date else [] ),
+                *( [str(row.get("entry_date", ""))] if has_entry_date else [] ),
                 f"{int(row.get('num_insiders', 0)):,}",
                 *( [f"{int(row.get('num_total_insiders', 0)):,}"] if has_total_insiders else [] ),
                 *( [f"{int(row.get('role_score', 0)):,}"] if has_role_score else [] ),
@@ -140,6 +151,12 @@ def main() -> None:
     parser.add_argument("--min-role-score", type=int, default=0, help="Minimum RoleScore filter")
     parser.add_argument("--min-people", type=int, default=None, help="Minimum people insiders filter")
     parser.add_argument(
+        "--as-of-filing-date",
+        type=str,
+        default=None,
+        help="As-of filing date (YYYY-MM-DD) for backtests; defaults to latest filing_date in DB",
+    )
+    parser.add_argument(
         "--max-fund-ratio",
         type=float,
         default=None,
@@ -158,6 +175,10 @@ def main() -> None:
     )
     args = parser.parse_args()
 
+    as_of_filing_date = None
+    if args.as_of_filing_date:
+        as_of_filing_date = datetime.strptime(args.as_of_filing_date, "%Y-%m-%d").date()
+
     df = get_top_cluster_buys(
         limit=args.limit,
         window_days=args.window_days,
@@ -171,6 +192,7 @@ def main() -> None:
         min_people=args.min_people,
         max_fund_ratio=args.max_fund_ratio,
         min_cluster_score=args.min_cluster_score,
+        as_of_filing_date=as_of_filing_date,
     )
 
     if df.empty:

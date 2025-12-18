@@ -91,6 +91,12 @@ def main() -> None:
     parser.add_argument("--min-role-score", type=int, default=0, help="Minimum RoleScore filter")
     parser.add_argument("--min-people", type=int, default=None, help="Minimum people insiders filter")
     parser.add_argument(
+        "--as-of-filing-date",
+        type=str,
+        default=None,
+        help="As-of filing date (YYYY-MM-DD) for backtests; defaults to latest filing_date in DB",
+    )
+    parser.add_argument(
         "--max-fund-ratio",
         type=float,
         default=None,
@@ -122,6 +128,10 @@ def main() -> None:
     args = parser.parse_args()
     args.use_exclusions = not args.no_exclusions
 
+    as_of_filing_date = None
+    if args.as_of_filing_date:
+        as_of_filing_date = datetime.strptime(args.as_of_filing_date, "%Y-%m-%d").date()
+
     df = get_top_cluster_buys(
         limit=args.limit,
         window_days=args.window_days,
@@ -135,6 +145,7 @@ def main() -> None:
         min_people=args.min_people,
         max_fund_ratio=args.max_fund_ratio,
         min_cluster_score=args.min_cluster_score,
+        as_of_filing_date=as_of_filing_date,
     )
 
     if df.empty:
@@ -165,6 +176,7 @@ def main() -> None:
             "ticker": args.ticker,
             "use_exclusions": args.use_exclusions,
             "limit": args.limit,
+            "as_of_filing_date": args.as_of_filing_date,
         },
     }
 

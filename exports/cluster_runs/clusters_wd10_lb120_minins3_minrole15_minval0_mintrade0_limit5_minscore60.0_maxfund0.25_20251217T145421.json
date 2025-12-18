@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "generated_at": "2025-12-17T09:53:48.874327+00:00",
+    "generated_at": "2025-12-17T14:54:21.580244+00:00",
     "row_count": 5,
     "filters": {
       "window_days": 10,
@@ -14,7 +14,8 @@
       "max_fund_ratio": 0.25,
       "ticker": null,
       "use_exclusions": true,
-      "limit": 5
+      "limit": 5,
+      "as_of_filing_date": null
     }
   },
   "rows": [
@@ -22,6 +23,8 @@
       "ticker": "AVBC",
       "window_start": "2025-07-27",
       "window_end": "2025-08-15",
+      "signal_filing_date": "2025-08-18",
+      "entry_date": "2025-08-19",
       "num_trades": 27,
       "num_insiders": 8,
       "num_total_insiders": 8,
@@ -45,6 +48,8 @@
       "ticker": "AVBH",
       "window_start": "2025-07-29",
       "window_end": "2025-08-08",
+      "signal_filing_date": "2025-08-11",
+      "entry_date": "2025-08-12",
       "num_trades": 21,
       "num_insiders": 17,
       "num_total_insiders": 21,
@@ -68,6 +73,8 @@
       "ticker": "HPP",
       "window_start": "2025-06-03",
       "window_end": "2025-06-12",
+      "signal_filing_date": "2025-06-16",
+      "entry_date": "2025-06-17",
       "num_trades": 14,
       "num_insiders": 14,
       "num_total_insiders": 14,
@@ -91,6 +98,8 @@
       "ticker": "WSBC",
       "window_start": "2025-09-08",
       "window_end": "2025-09-17",
+      "signal_filing_date": "2025-09-18",
+      "entry_date": "2025-09-19",
       "num_trades": 13,
       "num_insiders": 13,
       "num_total_insiders": 13,
@@ -114,6 +123,8 @@
       "ticker": "EMN",
       "window_start": "2025-08-18",
       "window_end": "2025-08-27",
+      "signal_filing_date": "2025-08-29",
+      "entry_date": "2025-08-30",
       "num_trades": 11,
       "num_insiders": 11,
       "num_total_insiders": 11,

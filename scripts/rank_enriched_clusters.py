@@ -38,11 +38,11 @@ def rank_clusters(
     skipped_valuation = 0
     
     for r in rows:
-        mcap = r.get("market_cap_at_window_end")
+        mcap = r.get("market_cap_at_entry", r.get("market_cap_at_window_end"))
         rel_val_pct = r.get("cluster_value_vs_mcap_pct")
-        pe = r.get("pe_ratio_at_window_end")
-        pb = r.get("pb_ratio_at_window_end")
-        peg = r.get("trailing_peg_ratio_at_window_end")
+        pe = r.get("pe_ratio_at_entry", r.get("pe_ratio_at_window_end"))
+        pb = r.get("pb_ratio_at_entry", r.get("pb_ratio_at_window_end"))
+        peg = r.get("trailing_peg_ratio_at_entry", r.get("trailing_peg_ratio_at_window_end"))
         
         if mcap is None or rel_val_pct is None:
             skipped_no_data += 1
@@ -100,21 +100,21 @@ def rank_clusters(
     
     # PRINT
     # Format: Ticker | Date | Score | Insiders | Total $ | MCap | % of Cap | 3m Rtn
-    header = f"{'TICKER':<6} | {'DATE':<10} | {'SCORE':<5} | {'INS':<3} | {'VALUE ($M)':<10} | {'MCAP ($M)':<10} | {'% MCAP':<8} | {'PE':<8} | {'PB':<8} | {'PEG':<8} | {'1M RTN':<8} | {'2M RTN':<8} | {'3M RTN':<8}"
+    header = f"{'TICKER':<6} | {'ENTRY':<10} | {'SCORE':<5} | {'INS':<3} | {'VALUE ($M)':<10} | {'MCAP ($M)':<10} | {'% MCAP':<8} | {'PE':<8} | {'PB':<8} | {'PEG':<8} | {'1M RTN':<8} | {'2M RTN':<8} | {'3M RTN':<8}"
     print(header)
     print("-" * len(header))
     
     for q in qualified:
         ticker = q.get("ticker")
-        date = q.get("signal_date") or q.get("window_end")
+        date = q.get("entry_date") or q.get("signal_filing_date") or q.get("signal_date") or q.get("window_end")
         score = round(q.get("cluster_score", 0), 1)
         ins = q.get("unique_insiders") or q.get("num_insiders")
         val_millions = round(q.get("total_value", 0) / 1_000_000, 2)
-        mcap_millions = round(q.get("market_cap_at_window_end", 0) / 1_000_000, 0)
+        mcap_millions = round((q.get("market_cap_at_entry", q.get("market_cap_at_window_end", 0)) or 0) / 1_000_000, 0)
         pct_cap = q.get("cluster_value_vs_mcap_pct")
-        pe = q.get("pe_ratio_at_window_end")
-        pb = q.get("pb_ratio_at_window_end")
-        peg = q.get("trailing_peg_ratio_at_window_end")
+        pe = q.get("pe_ratio_at_entry", q.get("pe_ratio_at_window_end"))
+        pb = q.get("pb_ratio_at_entry", q.get("pb_ratio_at_window_end"))
+        peg = q.get("trailing_peg_ratio_at_entry", q.get("trailing_peg_ratio_at_window_end"))
         rtn_1m = q.get("return_1m")
         rtn_2m = q.get("return_2m")
         rtn_3m = q.get("return_3m")
