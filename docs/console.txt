@@ -1,0 +1,209 @@
+(base) laudes@laudes-MS-7B79:~/zoot/projects/get-insider-db$ python scripts/enrich_clusters_with_price.py exports/cluster_runs/clusters_wd10_lb365_minins3_minrole15_minval0_mintrade0_limit200_minscore60.0_maxfund0.25_20251218T161809.json
+Rate limiting enabled: 1.0s between calls.
+Processing exports/cluster_runs/clusters_wd10_lb365_minins3_minrole15_minval0_mintrade0_limit200_minscore60.0_maxfund0.25_20251218T161809.json...
+  [1/39] Enriching EBC...
+DEBUG: No cached prices for EBC in DB.
+DEBUG: No cached fundamentals for EBC in DB.
+DEBUG: Fundamentals returned but no usable record near window_end for EBC (window_end=2020-10-17, lookback_days=730, forward_days=120).
+  [2/39] Enriching MTDR...
+DEBUG: No cached prices for MTDR in DB.
+DEBUG: No cached fundamentals for MTDR in DB.
+DEBUG: Fundamentals returned but no usable record near window_end for MTDR (window_end=2020-03-18, lookback_days=730, forward_days=120).
+  [3/39] Enriching DCOM...
+DEBUG: No cached prices for DCOM in DB.
+DEBUG: No cached fundamentals for DCOM in DB.
+DEBUG: Fundamentals returned but no usable record near window_end for DCOM (window_end=2020-02-07, lookback_days=730, forward_days=120).
+  [4/39] Enriching CCNE...
+DEBUG: No cached prices for CCNE in DB.
+DEBUG: No cached fundamentals for CCNE in DB.
+DEBUG: Fundamentals returned but no usable record near window_end for CCNE (window_end=2020-09-12, lookback_days=730, forward_days=120).
+  [5/39] Enriching YORW...
+DEBUG: No cached prices for YORW in DB.
+DEBUG: No cached fundamentals for YORW in DB.
+DEBUG: Fundamentals returned but no usable record near window_end for YORW (window_end=2020-04-21, lookback_days=730, forward_days=120).
+  [6/39] Enriching YORW...
+DEBUG: Found 5 cached prices for YORW from DB.
+DEBUG: No cached fundamentals for YORW in DB.
+DEBUG: Fundamentals returned but no usable record near window_end for YORW (window_end=2020-07-22, lookback_days=730, forward_days=120).
+  [7/39] Enriching YORW...
+DEBUG: Found 7 cached prices for YORW from DB.
+DEBUG: No cached fundamentals for YORW in DB.
+DEBUG: Fundamentals returned but no usable record near window_end for YORW (window_end=2020-01-22, lookback_days=730, forward_days=120).
+  [8/39] Enriching DRI...
+DEBUG: No cached prices for DRI in DB.
+DEBUG: No cached fundamentals for DRI in DB.
+DEBUG: Fundamentals returned but no usable record near window_end for DRI (window_end=2020-04-24, lookback_days=730, forward_days=120).
+  [9/39] Enriching AES...
+DEBUG: No cached prices for AES in DB.
+DEBUG: No cached fundamentals for AES in DB.
+DEBUG: Fundamentals returned but no usable record near window_end for AES (window_end=2020-03-24, lookback_days=730, forward_days=120).
+  [10/39] Enriching YORW...
+DEBUG: Found 7 cached prices for YORW from DB.
+DEBUG: No cached fundamentals for YORW in DB.
+DEBUG: Fundamentals returned but no usable record near window_end for YORW (window_end=2020-10-21, lookback_days=730, forward_days=120).
+  [11/39] Enriching OVV...
+DEBUG: No cached prices for OVV in DB.
+DEBUG: No cached fundamentals for OVV in DB.
+DEBUG: Fundamentals returned but no usable record near window_end for OVV (window_end=2020-03-25, lookback_days=730, forward_days=120).
+  [12/39] Enriching GEL...
+DEBUG: No cached prices for GEL in DB.
+DEBUG: No cached fundamentals for GEL in DB.
+DEBUG: Fundamentals returned but no usable record near window_end for GEL (window_end=2020-03-19, lookback_days=730, forward_days=120).
+  [13/39] Enriching WINT...
+DEBUG: No cached prices for WINT in DB.
+DEBUG: No cached fundamentals for WINT in DB.
+DEBUG: Fundamentals returned but no usable record near window_end for WINT (window_end=2020-05-28, lookback_days=730, forward_days=120).
+  [14/39] Enriching ED...
+DEBUG: No cached prices for ED in DB.
+DEBUG: No cached fundamentals for ED in DB.
+DEBUG: Fundamentals returned but no usable record near window_end for ED (window_end=2020-07-08, lookback_days=730, forward_days=120).
+  [15/39] Enriching ED...
+DEBUG: Found 6 cached prices for ED from DB.
+DEBUG: No cached fundamentals for ED in DB.
+DEBUG: Fundamentals returned but no usable record near window_end for ED (window_end=2020-10-08, lookback_days=730, forward_days=120).
+  [16/39] Enriching ED...
+DEBUG: Found 5 cached prices for ED from DB.
+DEBUG: No cached fundamentals for ED in DB.
+DEBUG: Fundamentals returned but no usable record near window_end for ED (window_end=2020-04-08, lookback_days=730, forward_days=120).
+  [17/39] Enriching ED...
+DEBUG: Found 6 cached prices for ED from DB.
+DEBUG: No cached fundamentals for ED in DB.
+DEBUG: Fundamentals returned but no usable record near window_end for ED (window_end=2020-01-08, lookback_days=730, forward_days=120).
+  [18/39] Enriching CLDX...
+DEBUG: No cached prices for CLDX in DB.
+DEBUG: No cached fundamentals for CLDX in DB.
+DEBUG: Fundamentals returned but no usable record near window_end for CLDX (window_end=2020-06-13, lookback_days=730, forward_days=120).
+  [19/39] Enriching BANF...
+DEBUG: No cached prices for BANF in DB.
+DEBUG: No cached fundamentals for BANF in DB.
+DEBUG: Fundamentals returned but no usable record near window_end for BANF (window_end=2020-03-19, lookback_days=730, forward_days=120).
+  [20/39] Enriching DCP...
+DEBUG: No cached prices for DCP in DB.
+DEBUG: No cached fundamentals for DCP in DB.
+HTTP Error 400 for URL: https://api.financialdatasets.ai/prices/
+Response: {"error":"Invalid ticker","message":"Please provide a valid ticker from https://www.sec.gov/files/company_tickers.json"}
+DEBUG: Fundamentals returned but no usable record near window_end for DCP (window_end=2020-03-14, lookback_days=730, forward_days=120).
+HTTP Error 400 for URL: https://api.financialdatasets.ai/prices/
+Response: {"error":"Invalid ticker","message":"Please provide a valid ticker from https://www.sec.gov/files/company_tickers.json"}
+HTTP Error 400 for URL: https://api.financialdatasets.ai/prices/
+Response: {"error":"Invalid ticker","message":"Please provide a valid ticker from https://www.sec.gov/files/company_tickers.json"}
+Warning: Error fetching history for DCP: RetryError[<Future at 0x764a59121fd0 state=finished raised HTTPError>]
+  [21/39] Enriching FUN...
+DEBUG: No cached prices for FUN in DB.
+DEBUG: No cached fundamentals for FUN in DB.
+DEBUG: Fundamentals returned but no usable record near window_end for FUN (window_end=2020-03-13, lookback_days=730, forward_days=120).
+  [22/39] Enriching ED...
+DEBUG: Found 69 cached prices for ED from DB.
+DEBUG: No cached fundamentals for ED in DB.
+DEBUG: Fundamentals returned but no usable record near window_end for ED (window_end=2020-09-04, lookback_days=730, forward_days=120).
+  [23/39] Enriching ED...
+DEBUG: Found 70 cached prices for ED from DB.
+DEBUG: No cached fundamentals for ED in DB.
+DEBUG: Fundamentals returned but no usable record near window_end for ED (window_end=2020-06-05, lookback_days=730, forward_days=120).
+  [24/39] Enriching ED...
+DEBUG: Found 69 cached prices for ED from DB.
+DEBUG: No cached fundamentals for ED in DB.
+DEBUG: Fundamentals returned but no usable record near window_end for ED (window_end=2020-03-06, lookback_days=730, forward_days=120).
+  [25/39] Enriching ED...
+DEBUG: Found 71 cached prices for ED from DB.
+DEBUG: No cached fundamentals for ED in DB.
+DEBUG: Fundamentals returned but no usable record near window_end for ED (window_end=2020-08-06, lookback_days=730, forward_days=120).
+  [26/39] Enriching ED...
+DEBUG: Found 68 cached prices for ED from DB.
+DEBUG: No cached fundamentals for ED in DB.
+DEBUG: Fundamentals returned but no usable record near window_end for ED (window_end=2020-02-07, lookback_days=730, forward_days=120).
+  [27/39] Enriching ED...
+DEBUG: Found 70 cached prices for ED from DB.
+DEBUG: No cached fundamentals for ED in DB.
+DEBUG: Fundamentals returned but no usable record near window_end for ED (window_end=2020-05-07, lookback_days=730, forward_days=120).
+  [28/39] Enriching AFI...
+DEBUG: No cached prices for AFI in DB.
+DEBUG: No cached fundamentals for AFI in DB.
+HTTP Error 400 for URL: https://api.financialdatasets.ai/prices/
+Response: {"error":"Invalid ticker","message":"Please provide a valid ticker from https://www.sec.gov/files/company_tickers.json"}
+HTTP Error 400 for URL: https://api.financialdatasets.ai/financial-metrics
+Response: {"error":"Invalid TICKER","message":"Please provide a valid TICKER."}
+HTTP Error 400 for URL: https://api.financialdatasets.ai/prices/
+Response: {"error":"Invalid ticker","message":"Please provide a valid ticker from https://www.sec.gov/files/company_tickers.json"}
+HTTP Error 400 for URL: https://api.financialdatasets.ai/financial-metrics
+Response: {"error":"Invalid TICKER","message":"Please provide a valid TICKER."}
+HTTP Error 400 for URL: https://api.financialdatasets.ai/prices/
+Response: {"error":"Invalid ticker","message":"Please provide a valid ticker from https://www.sec.gov/files/company_tickers.json"}
+Warning: Error fetching history for AFI: RetryError[<Future at 0x764a59172b50 state=finished raised HTTPError>]
+HTTP Error 400 for URL: https://api.financialdatasets.ai/financial-metrics
+Response: {"error":"Invalid TICKER","message":"Please provide a valid TICKER."}
+Error fetching Financial Datasets AI financial metrics for AFI: RetryError[<Future at 0x764a59178c50 state=finished raised HTTPError>]
+HTTP Error 400 for URL: https://api.financialdatasets.ai/financial-metrics
+Response: {"error":"Invalid TICKER","message":"Please provide a valid TICKER."}
+HTTP Error 400 for URL: https://api.financialdatasets.ai/financial-metrics
+Response: {"error":"Invalid TICKER","message":"Please provide a valid TICKER."}
+HTTP Error 400 for URL: https://api.financialdatasets.ai/financial-metrics
+Response: {"error":"Invalid TICKER","message":"Please provide a valid TICKER."}
+Error fetching Financial Datasets AI financial metrics for AFI: RetryError[<Future at 0x764a591725d0 state=finished raised HTTPError>]
+DEBUG: No fundamentals records returned for AFI from API.
+  [29/39] Enriching ED...
+DEBUG: Found 28 cached prices for ED from DB.
+DEBUG: No cached fundamentals for ED in DB.
+DEBUG: Fundamentals returned but no usable record near window_end for ED (window_end=2020-12-05, lookback_days=730, forward_days=120).
+  [30/39] Enriching FMBI...
+DEBUG: No cached prices for FMBI in DB.
+DEBUG: No cached fundamentals for FMBI in DB.
+HTTP Error 400 for URL: https://api.financialdatasets.ai/prices/
+Response: {"error":"Invalid ticker","message":"Please provide a valid ticker from https://www.sec.gov/files/company_tickers.json"}
+DEBUG: Using next-period fundamentals for FMBI: 2020-06-30 (window_end=2020-06-19).
+HTTP Error 400 for URL: https://api.financialdatasets.ai/prices/
+Response: {"error":"Invalid ticker","message":"Please provide a valid ticker from https://www.sec.gov/files/company_tickers.json"}
+HTTP Error 400 for URL: https://api.financialdatasets.ai/prices/
+Response: {"error":"Invalid ticker","message":"Please provide a valid ticker from https://www.sec.gov/files/company_tickers.json"}
+Warning: Error fetching history for FMBI: RetryError[<Future at 0x764a59172150 state=finished raised HTTPError>]
+  [31/39] Enriching MPB...
+DEBUG: No cached prices for MPB in DB.
+DEBUG: No cached fundamentals for MPB in DB.
+DEBUG: Fundamentals returned but no usable record near window_end for MPB (window_end=2020-07-23, lookback_days=730, forward_days=120).
+  [32/39] Enriching RILY...
+DEBUG: No cached prices for RILY in DB.
+DEBUG: No cached fundamentals for RILY in DB.
+DEBUG: Fundamentals returned but no usable record near window_end for RILY (window_end=2020-03-21, lookback_days=730, forward_days=120).
+  [33/39] Enriching PGC...
+DEBUG: No cached prices for PGC in DB.
+DEBUG: No cached fundamentals for PGC in DB.
+DEBUG: Fundamentals returned but no usable record near window_end for PGC (window_end=2020-03-20, lookback_days=730, forward_days=120).
+  [34/39] Enriching PGC...
+DEBUG: No cached prices for PGC in DB.
+DEBUG: No cached fundamentals for PGC in DB.
+DEBUG: Fundamentals returned but no usable record near window_end for PGC (window_end=2020-11-10, lookback_days=730, forward_days=120).
+  [35/39] Enriching HBMD...
+DEBUG: No cached prices for HBMD in DB.
+DEBUG: No cached fundamentals for HBMD in DB.
+HTTP Error 400 for URL: https://api.financialdatasets.ai/prices/
+Response: {"error":"Invalid ticker","message":"Please provide a valid ticker from https://www.sec.gov/files/company_tickers.json"}
+HTTP Error 400 for URL: https://api.financialdatasets.ai/prices/
+Response: {"error":"Invalid ticker","message":"Please provide a valid ticker from https://www.sec.gov/files/company_tickers.json"}
+HTTP Error 400 for URL: https://api.financialdatasets.ai/prices/
+Response: {"error":"Invalid ticker","message":"Please provide a valid ticker from https://www.sec.gov/files/company_tickers.json"}
+Warning: Error fetching history for HBMD: RetryError[<Future at 0x764a59122450 state=finished raised HTTPError>]
+  [36/39] Enriching TRST...
+DEBUG: No cached prices for TRST in DB.
+DEBUG: No cached fundamentals for TRST in DB.
+DEBUG: Fundamentals returned but no usable record near window_end for TRST (window_end=2020-05-07, lookback_days=730, forward_days=120).
+  [37/39] Enriching WSBC...
+DEBUG: No cached prices for WSBC in DB.
+DEBUG: No cached fundamentals for WSBC in DB.
+DEBUG: Fundamentals returned but no usable record near window_end for WSBC (window_end=2020-08-13, lookback_days=730, forward_days=120).
+  [38/39] Enriching OII...
+DEBUG: No cached prices for OII in DB.
+DEBUG: No cached fundamentals for OII in DB.
+DEBUG: Fundamentals returned but no usable record near window_end for OII (window_end=2020-03-17, lookback_days=730, forward_days=120).
+  [39/39] Enriching CIT...
+DEBUG: No cached prices for CIT in DB.
+DEBUG: No cached fundamentals for CIT in DB.
+HTTP Error 400 for URL: https://api.financialdatasets.ai/prices/
+Response: {"error":"Invalid ticker","message":"Please provide a valid ticker from https://www.sec.gov/files/company_tickers.json"}
+DEBUG: Using next-period fundamentals for CIT: 2020-03-31 (window_end=2020-03-26).
+HTTP Error 400 for URL: https://api.financialdatasets.ai/prices/
+Response: {"error":"Invalid ticker","message":"Please provide a valid ticker from https://www.sec.gov/files/company_tickers.json"}
+HTTP Error 400 for URL: https://api.financialdatasets.ai/prices/
+Response: {"error":"Invalid ticker","message":"Please provide a valid ticker from https://www.sec.gov/files/company_tickers.json"}
+Warning: Error fetching history for CIT: RetryError[<Future at 0x764a591b2250 state=finished raised HTTPError>]
+Done! Enriched data written to: exports/cluster_runs/clusters_wd10_lb365_minins3_minrole15_minval0_mintrade0_limit200_minscore60.0_maxfund0.25_20251218T161809_enriched.json
+(base) laudes@laudes-MS-7B79:~/zoot/projects/get-insider-db$ 

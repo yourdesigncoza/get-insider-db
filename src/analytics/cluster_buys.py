@@ -5,6 +5,7 @@ from datetime import date, timedelta
 from typing import Any, Dict, Optional
 
 import pandas as pd
+from sqlalchemy import inspect
 from sqlalchemy import text
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
@@ -27,6 +28,37 @@ def _first_nonempty(series: pd.Series) -> str:
             if trimmed:
                 return trimmed
     return ""
+
+def _first_nonempty_any(series: pd.Series) -> str:
+    """
+    Like _first_nonempty, but also supports non-string values (e.g. numeric CIKs).
+    """
+    for value in series:
+        if value is None:
+            continue
+        try:
+            if pd.isna(value):
+                continue
+        except Exception:
+            pass
+        text_value = str(value).strip()
+        if text_value:
+            return text_value
+    return ""
+
+
+def _get_optional_column(engine: Engine, table: str, candidates: tuple[str, ...]) -> str | None:
+    """
+    Return the first column name from `candidates` that exists on `table`, else None.
+    """
+    try:
+        cols = {col["name"] for col in inspect(engine).get_columns(table)}
+    except Exception:
+        return None
+    for name in candidates:
+        if name in cols:
+            return name
+    return None
 
 
 def _format_insider_label(
@@ -158,6 +190,9 @@ def find_cluster_buys(
 ) -> pd.DataFrame:
     end_date = as_of_filing_date or get_latest_filing_date()
     start_date = end_date - timedelta(days=lookback_days)
+    # Guardrail: Form 4 feeds occasionally contain malformed transaction dates (e.g., year "0024"),
+    # which can break pandas datetime conversions and create lookahead artifacts. Filter them out.
+    min_transaction_date = date(1990, 1, 1)
 
     engine = _get_engine()
     window_interval = window_days - 1
@@ -177,6 +212,7 @@ def find_cluster_buys(
             SELECT s.*
             FROM insider_buy_signals s
             WHERE s.filing_date BETWEEN :start_date AND :end_date
+              AND s.transaction_date BETWEEN :min_transaction_date AND :end_date
               AND s.ticker IS NOT NULL
               AND s.ticker <> 'NONE'
               {value_filter}
@@ -275,6 +311,7 @@ def find_cluster_buys(
     params = {
         "start_date": start_date,
         "end_date": end_date,
+        "min_transaction_date": min_transaction_date,
         "min_insiders": min_insiders,
         "min_total_value": min_total_value,
         "min_trade_value": min_trade_value,
@@ -287,9 +324,9 @@ def find_cluster_buys(
     # Ensure correct types.
     for col in ("window_start", "window_end"):
         if col in df:
-            df[col] = pd.to_datetime(df[col]).dt.date
+            df[col] = pd.to_datetime(df[col], errors="coerce").dt.date
     if "signal_filing_date" in df:
-        df["signal_filing_date"] = pd.to_datetime(df["signal_filing_date"]).dt.date
+        df["signal_filing_date"] = pd.to_datetime(df["signal_filing_date"], errors="coerce").dt.date
     if "top_insiders" in df:
         df["top_insiders"] = df["top_insiders"].fillna("")
 
@@ -297,6 +334,12 @@ def find_cluster_buys(
         return df
 
     # Fetch base transactions to recompute metrics for merged windows.
+    issuer_cik_col = _get_optional_column(engine, "insider_buy_signals", ("issuer_cik", "cik"))
+    issuer_name_col = _get_optional_column(
+        engine,
+        "insider_buy_signals",
+        ("issuer_name", "company_name", "issuer", "company"),
+    )
     base_ticker_filter = "AND ticker = :ticker" if ticker else ""
     base_value_filter = "AND COALESCE(total_value, 0) >= :min_trade_value" if min_trade_value else ""
     base_exclusions = """
@@ -310,6 +353,8 @@ def find_cluster_buys(
     base_sql = f"""
         SELECT
             ticker,
+            {f"{issuer_cik_col} AS issuer_cik," if issuer_cik_col else ""}
+            {f"{issuer_name_col} AS issuer_name," if issuer_name_col else ""}
             transaction_date,
             accession_number,
             filing_date,
@@ -322,6 +367,7 @@ def find_cluster_buys(
             shares_owned_after
         FROM insider_buy_signals
         WHERE filing_date BETWEEN :start_date AND :end_date
+          AND transaction_date BETWEEN :min_transaction_date AND :end_date
           AND ticker IS NOT NULL
           AND ticker <> 'NONE'
           {base_value_filter}
@@ -334,8 +380,9 @@ def find_cluster_buys(
     if base_df.empty:
         return pd.DataFrame(columns=df.columns)
 
-    base_df["transaction_date"] = pd.to_datetime(base_df["transaction_date"])
-    base_df["filing_date"] = pd.to_datetime(base_df["filing_date"]) # Ensure filing_date is datetime for calculations
+    base_df["transaction_date"] = pd.to_datetime(base_df["transaction_date"], errors="coerce")
+    base_df["filing_date"] = pd.to_datetime(base_df["filing_date"], errors="coerce") # Ensure filing_date is datetime for calculations
+    base_df = base_df[base_df["transaction_date"].notna() & base_df["filing_date"].notna()].copy()
     base_df["shares"] = pd.to_numeric(base_df["shares"], errors="coerce").fillna(0.0)
     base_df["total_value"] = pd.to_numeric(base_df["total_value"], errors="coerce").fillna(0.0)
     base_df["shares_owned_after"] = pd.to_numeric(base_df["shares_owned_after"], errors="coerce").fillna(0.0)
@@ -436,6 +483,9 @@ def find_cluster_buys(
             ]
             if subset.empty:
                 continue
+
+            issuer_cik = _first_nonempty_any(subset["issuer_cik"]) if "issuer_cik" in subset.columns else ""
+            issuer_name = _first_nonempty(subset["issuer_name"]) if "issuer_name" in subset.columns else ""
             # Lookahead-safe anchor: what you could know in real time is bounded by filing_date.
             # We'll use the latest filing_date inside the cluster as the disclosure timestamp.
             signal_filing_date = subset["filing_date"].max().date()
@@ -517,6 +567,8 @@ def find_cluster_buys(
             merged_records.append(
                 {
                     "ticker": ticker_value,
+                    "issuer_cik": issuer_cik or None,
+                    "issuer_name": issuer_name or None,
                     "window_start": start,
                     "window_end": end,
                     "signal_filing_date": signal_filing_date,
@@ -614,6 +666,7 @@ def find_tradeable_cluster_signals(
 
     engine = _get_engine()
     window_interval = window_days - 1
+    min_transaction_date = date(1990, 1, 1)
 
     ticker_filter = "AND ticker = :ticker" if ticker else ""
     value_filter = "AND COALESCE(total_value, 0) >= :min_trade_value" if min_trade_value else ""
@@ -642,6 +695,7 @@ def find_tradeable_cluster_signals(
             shares_owned_after
         FROM insider_buy_signals
         WHERE filing_date BETWEEN :start_date AND :end_date
+          AND transaction_date BETWEEN :min_transaction_date AND :end_date
           AND ticker IS NOT NULL
           AND ticker <> 'NONE'
           {value_filter}
@@ -652,6 +706,7 @@ def find_tradeable_cluster_signals(
     params: Dict[str, Any] = {
         "start_date": start_filing_date,
         "end_date": end_filing_date,
+        "min_transaction_date": min_transaction_date,
         "min_trade_value": min_trade_value,
     }
     if ticker:
@@ -661,8 +716,15 @@ def find_tradeable_cluster_signals(
     if base_df.empty:
         return pd.DataFrame()
 
-    base_df["transaction_date"] = pd.to_datetime(base_df["transaction_date"])
-    base_df["filing_date"] = pd.to_datetime(base_df["filing_date"])
+    # Guardrail: Form 4 feeds occasionally contain malformed transaction dates (e.g., year "0024"),
+    # which can break pandas datetime conversions and create lookahead artifacts. Filter them out.
+    min_transaction_date = pd.Timestamp(date(1990, 1, 1))
+
+    base_df["transaction_date"] = pd.to_datetime(base_df["transaction_date"], errors="coerce")
+    base_df["filing_date"] = pd.to_datetime(base_df["filing_date"], errors="coerce")
+    base_df = base_df[base_df["transaction_date"].notna() & base_df["filing_date"].notna()].copy()
+    base_df = base_df[base_df["transaction_date"] >= min_transaction_date]
+    base_df = base_df[base_df["transaction_date"] <= pd.Timestamp(end_filing_date)]
     base_df["shares"] = pd.to_numeric(base_df["shares"], errors="coerce").fillna(0.0)
     base_df["total_value"] = pd.to_numeric(base_df["total_value"], errors="coerce").fillna(0.0)
     base_df["shares_owned_after"] = pd.to_numeric(base_df["shares_owned_after"], errors="coerce").fillna(0.0)

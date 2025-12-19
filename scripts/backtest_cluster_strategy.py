@@ -8,6 +8,7 @@ Uses:
 """
 
 import argparse
+import json
 import statistics
 import sys
 from datetime import date, datetime, timedelta
@@ -27,6 +28,40 @@ from src.analytics.cluster_buys import find_tradeable_cluster_signals
 
 def _parse_date(value: str) -> date:
     return datetime.strptime(value, "%Y-%m-%d").date()
+
+def _load_enrichment_index(path: Path) -> tuple[Dict[tuple[str, date], Dict[str, Any]], Dict[str, Dict[str, Any]]]:
+    """
+    Load an enriched cluster export JSON and index it by (ticker, entry_date) and by ticker.
+
+    Returns:
+      - by_event: (ticker, entry_date) -> row
+      - by_ticker: ticker -> row (only when unambiguous)
+    """
+    payload = json.loads(path.read_text())
+    rows = payload.get("rows", [])
+    by_event: Dict[tuple[str, date], Dict[str, Any]] = {}
+    by_ticker_candidates: Dict[str, List[Dict[str, Any]]] = {}
+
+    for row in rows:
+        ticker = row.get("ticker")
+        entry_date = row.get("entry_date")
+        if not ticker:
+            continue
+        if isinstance(entry_date, str):
+            try:
+                entry_date = _parse_date(entry_date)
+            except Exception:
+                entry_date = None
+        if isinstance(entry_date, date):
+            by_event[(ticker, entry_date)] = row
+        by_ticker_candidates.setdefault(ticker, []).append(row)
+
+    by_ticker: Dict[str, Dict[str, Any]] = {}
+    for ticker, candidates in by_ticker_candidates.items():
+        if len(candidates) == 1:
+            by_ticker[ticker] = candidates[0]
+
+    return by_event, by_ticker
 
 
 def _get_price_on_or_after(
@@ -69,6 +104,12 @@ def _compute_returns(
 ) -> List[Dict[str, Any]]:
     rows: List[Dict[str, Any]] = []
     for idx, sig in enumerate(signals):
+        status = sig.get("enrichment_status")
+        if status is not None and status != "ok":
+            if debug and idx < debug_limit:
+                print(f"DEBUG {sig.get('ticker')}: skipped due to enrichment_status={status}")
+            continue
+
         ticker = sig.get("ticker")
         entry_date = sig.get(entry_date_field)
         if not ticker or not entry_date:
@@ -188,6 +229,12 @@ def main() -> None:
         default=None,
         help="Optional CSV path for per-signal returns",
     )
+    p.add_argument(
+        "--enriched-export",
+        type=str,
+        default=None,
+        help="Optional enriched cluster export JSON; if provided, signals with enrichment_status != ok are skipped",
+    )
     args = p.parse_args()
 
     horizons_days = [int(x.strip()) for x in args.horizons.split(",") if x.strip()]
@@ -217,6 +264,24 @@ def main() -> None:
         return
 
     rows = signals_df.to_dict(orient="records")
+    if args.enriched_export:
+        by_event, by_ticker = _load_enrichment_index(Path(args.enriched_export))
+        for r in rows:
+            ticker = r.get("ticker")
+            entry_date = r.get("entry_date")
+            if isinstance(entry_date, str):
+                try:
+                    entry_date = _parse_date(entry_date)
+                except Exception:
+                    entry_date = None
+            enriched = None
+            if ticker and isinstance(entry_date, date):
+                enriched = by_event.get((ticker, entry_date))
+            if enriched is None and ticker:
+                enriched = by_ticker.get(ticker)
+            if enriched:
+                r["enrichment_status"] = enriched.get("enrichment_status")
+                r["enrichment_errors"] = enriched.get("enrichment_errors")
     # Compare entry policies using fields already included in the signal output.
     for entry_delay_days in entry_delays:
         label = f"first_qualify_delay{entry_delay_days}d"
