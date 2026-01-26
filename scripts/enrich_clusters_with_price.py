@@ -30,6 +30,7 @@ from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_excep
 # Ensure root is in pythonpath if running as script
 sys.path.append(os.getcwd())
 from src.config import get_engine
+from src.cluster_scoring import compute_market_cap_adjusted_score
 
 # Load environment variables
 load_dotenv()
@@ -692,6 +693,13 @@ def enrich_row(row: Dict[str, Any]) -> Dict[str, Any]:
     if market_cap and total_value and market_cap > 0:
         cluster_vs_mcap_pct = round((total_value / market_cap) * 100.0, 4)
 
+    # Compute market-cap adjusted score
+    original_score = row.get("cluster_score", 0.0)
+    adjusted_cluster_score = compute_market_cap_adjusted_score(
+        original_score,
+        cluster_vs_mcap_pct
+    )
+
     new_row = row.copy()
     new_row.update({
         "enrichment_status": enrichment_status,
@@ -710,6 +718,7 @@ def enrich_row(row: Dict[str, Any]) -> Dict[str, Any]:
         "pb_ratio_at_window_end": pb_ratio,
         "trailing_peg_ratio_at_window_end": trailing_peg_ratio,
         "cluster_value_vs_mcap_pct": cluster_vs_mcap_pct,
+        "adjusted_cluster_score": adjusted_cluster_score,
         **results
     })
     return new_row

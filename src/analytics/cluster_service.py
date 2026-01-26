@@ -12,11 +12,14 @@ from sqlalchemy.orm import Session
 
 from src.config import get_engine
 from src.insider_classification import normalize_insider_name
+from src.insider_roles import ROLE_WEIGHTS  # Canonical source (integer scale)
 
 logger = logging.getLogger(__name__)
 
-# Recap weights
-ROLE_WEIGHTS = {
+# DEPRECATED: Legacy float-scale weights (kept for reference only)
+# Use ROLE_WEIGHTS from src.insider_roles instead (integer scale: CFO=4, CEO=2, etc.)
+# These float weights were used for a different scoring model and are no longer active.
+_LEGACY_ROLE_WEIGHTS_FLOAT = {
     "CFO": 1.3,
     "CHIEF FINANCIAL OFFICER": 1.3,
     "GENERAL COUNSEL": 1.2,

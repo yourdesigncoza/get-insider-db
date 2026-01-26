@@ -627,6 +627,22 @@ CREATE INDEX idx_subm_ticker_filingdate ON public.form345_submission USING btree
 
 
 --
+-- Name: idx_nonderiv_trans_code_accession; Type: INDEX; Schema: public; Owner: myuser
+-- Performance: Composite index for insider_buy_signals VIEW (filter + join)
+--
+
+CREATE INDEX idx_nonderiv_trans_code_accession ON public.form345_nonderiv_trans USING btree ("TRANS_CODE", "ACCESSION_NUMBER");
+
+
+--
+-- Name: idx_subm_filing_date; Type: INDEX; Schema: public; Owner: myuser
+-- Performance: Filing date range queries in cluster detection
+--
+
+CREATE INDEX idx_subm_filing_date ON public.form345_submission USING btree ("FILING_DATE");
+
+
+--
 -- Name: cluster_event_members cluster_event_members_cluster_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: myuser
 --
 

@@ -5,6 +5,9 @@ Composite cluster scoring for insider buy windows.
 from __future__ import annotations
 
 import math
+from typing import Optional
+
+from src.scoring_config.scoring_weights import SCORING_WEIGHTS as W
 
 
 def compute_cluster_score(
@@ -28,6 +31,8 @@ def compute_cluster_score(
       - Higher avg_percent_change is good (insiders increasing their stake significantly).
       - Lower avg_days_to_file is good (faster filing suggests more conviction/urgency).
       - Lower avg_sale_to_purchase_ratio is good (more purchases relative to sales).
+
+    Weights are sourced from src.config.scoring_weights.SCORING_WEIGHTS.
     """
     all_insiders = max(int(all_insiders or 0), 1)
     people = int(people or 0)
@@ -41,22 +46,14 @@ def compute_cluster_score(
     value_score = math.log10(total_value_usd + 1.0) if total_value_usd > 0 else 0.0
     fund_ratio = funds / all_insiders
 
-    w_role = 2.0
-    w_people = 1.0
-    w_value = 2.0
-    w_fund = 2.0  # penalty
-    w_percent_change = 5.0
-    w_days_to_file = -0.5  # Penalty for more days to file
-    w_sale_to_purchase_ratio = -3.0 # Penalty for higher sale-to-purchase ratio
-
     raw_score = (
-        w_role * role_score
-        + w_people * people
-        + w_value * value_score
-        - w_fund * fund_ratio
-        + w_percent_change * avg_percent_change
-        + w_days_to_file * avg_days_to_file
-        + w_sale_to_purchase_ratio * avg_sale_to_purchase_ratio
+        W.w_role * role_score
+        + W.w_people * people
+        + W.w_value * value_score
+        - W.w_fund * fund_ratio
+        + W.w_percent_change * avg_percent_change
+        + W.w_days_to_file * avg_days_to_file
+        + W.w_sale_to_purchase_ratio * avg_sale_to_purchase_ratio
     )
 
     # Normalize to 0-100 using an exponential saturation curve.
@@ -68,6 +65,40 @@ def compute_cluster_score(
     if raw_score <= 0:
         return 0.0
 
-    k = 65.0
-    final_score = 100.0 * (1.0 - math.exp(-raw_score / k))
+    final_score = 100.0 * (1.0 - math.exp(-raw_score / W.saturation_k))
     return final_score
+
+
+def compute_market_cap_adjusted_score(
+    cluster_score: float,
+    cluster_value_vs_mcap_pct: Optional[float],
+) -> float:
+    """
+    Adjust cluster_score by market-cap relative conviction.
+
+    This function applies a bonus to the cluster score based on how significant
+    the cluster's total value is relative to the company's market cap.
+
+    A $1M purchase is more significant for a $100M company (1%) than for a
+    $10B company (0.01%). This adjustment rewards higher relative conviction.
+
+    Args:
+        cluster_score: The original cluster score (0-100)
+        cluster_value_vs_mcap_pct: Cluster value as percentage of market cap
+                                   (e.g., 0.5 means 0.5% of market cap)
+
+    Returns:
+        Adjusted score, capped at 100.0
+
+    Example:
+        - cluster_score=70, mcap_pct=0.1 (0.1%) → bonus=5, adjusted=75
+        - cluster_score=70, mcap_pct=0.5 (0.5%) → bonus=25, adjusted=95
+        - cluster_score=70, mcap_pct=1.0 (1.0%) → bonus=30 (capped), adjusted=100
+    """
+    if cluster_value_vs_mcap_pct is None or cluster_value_vs_mcap_pct <= 0:
+        return cluster_score
+
+    # Bonus based on relative conviction
+    # w_mcap_rel=50 means 0.1% of mcap → +5 points, 0.5% → +25 points
+    mcap_bonus = min(cluster_value_vs_mcap_pct * W.w_mcap_rel, 30.0)
+    return min(cluster_score + mcap_bonus, 100.0)

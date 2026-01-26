@@ -402,7 +402,8 @@ def find_cluster_buys(
 
     # Apply feature engineering functions
     base_df = calculate_days_to_file(base_df)
-    base_df = calculate_sale_to_purchase_ratio(base_df, lookback_days=lookback_days)
+    # NOTE: sale_to_purchase_ratio is now calculated per-cluster inside the loop
+    # to avoid look-ahead bias (using only data known at signal_filing_date)
 
     # Calculate percent change grouped by (accession_number, normalized_name)
     # This prevents counting each line item as a separate conviction event with varying bases.
@@ -490,6 +491,28 @@ def find_cluster_buys(
             # We'll use the latest filing_date inside the cluster as the disclosure timestamp.
             signal_filing_date = subset["filing_date"].max().date()
             entry_date = signal_filing_date + timedelta(days=1)
+
+            # Calculate sale_to_purchase_ratio using only temporally-available data
+            # Filter to filings known at signal_filing_date to avoid look-ahead bias
+            temporally_safe_df = ticker_rows[
+                ticker_rows["filing_date"].dt.date <= signal_filing_date
+            ]
+            temporally_safe_df = calculate_sale_to_purchase_ratio(
+                temporally_safe_df.copy(),
+                lookback_days=lookback_days
+            )
+            # Get the ratio values for insiders in this subset
+            ratio_lookup = temporally_safe_df.set_index(
+                ["normalized_name", "transaction_date"]
+            )["sale_to_purchase_ratio"].to_dict()
+            subset = subset.copy()
+            subset["sale_to_purchase_ratio"] = subset.apply(
+                lambda r: ratio_lookup.get(
+                    (r["normalized_name"], r["transaction_date"]), 0.0
+                ),
+                axis=1
+            )
+
             num_trades = len(subset)
             total_shares = subset["shares"].sum()
             total_value = subset["total_value"].sum()
@@ -738,7 +761,8 @@ def find_tradeable_cluster_signals(
     base_df["normalized_name"] = base_df["insider_name"].map(normalize_insider_name)
 
     base_df = calculate_days_to_file(base_df)
-    base_df = calculate_sale_to_purchase_ratio(base_df, lookback_days=lookback_days_for_features)
+    # NOTE: sale_to_purchase_ratio is now calculated per-filing-date inside the loop
+    # to avoid look-ahead bias (using only data known at signal time)
 
     filing_stats = base_df.groupby(["accession_number", "normalized_name"]).agg(
         filing_bought=("shares", "sum"),
@@ -793,6 +817,12 @@ def find_tradeable_cluster_signals(
                     continue
 
             revealed_df = ticker_df[ticker_df["filing_date"].dt.date <= filing_date_ts]
+            # Calculate sale_to_purchase_ratio using only temporally-available data
+            # This prevents look-ahead bias by using only filings known at this point
+            revealed_df = calculate_sale_to_purchase_ratio(
+                revealed_df.copy(),
+                lookback_days=lookback_days_for_features
+            )
             idx = best_qualifying_window_indices(
                 revealed_df,
                 window_interval_days=window_interval,

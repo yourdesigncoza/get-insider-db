@@ -1,34 +1,17 @@
 """
 Role-based weighting for insiders based on officer titles and flags.
+
+Weights are sourced from src.config.scoring_weights.ROLE_WEIGHTS.
 """
 
 from __future__ import annotations
 
 from typing import Optional
 
-ROLE_WEIGHTS: dict[str, int] = {
-    "CFO": 4,
-    "CHIEF FINANCIAL OFFICER": 4,
-    "GENERAL COUNSEL": 4,
-    "CHIEF LEGAL OFFICER": 4,
-    "COO": 3,
-    "CHIEF OPERATING OFFICER": 3,
-    "VP": 3,
-    "VICE PRESIDENT": 3,
-    "SVP": 3,
-    "EVP": 3,
-    "SENIOR VICE PRESIDENT": 3,
-    "EXECUTIVE VICE PRESIDENT": 3,
-    "CMO": 3,
-    "CHIEF MARKETING OFFICER": 3,
-    "CHIEF COMPLIANCE OFFICER": 3,
-    "CHIEF PORTFOLIO MANAGER": 3,
-    "CEO": 2,
-    "CHIEF EXECUTIVE OFFICER": 2,
-    "PRESIDENT": 2,
-    "OFFICER": 1,
-    "DIRECTOR": 1,
-}
+from src.scoring_config.scoring_weights import ROLE_WEIGHTS as _ROLE_WEIGHTS_CONFIG
+
+# Export as dict for backward compatibility
+ROLE_WEIGHTS: dict[str, int] = _ROLE_WEIGHTS_CONFIG.as_dict()
 
 
 def compute_insider_role_weight(
@@ -38,6 +21,12 @@ def compute_insider_role_weight(
 ) -> int:
     """
     Determine an insider's role weight based on their title/flags.
+
+    Higher weights indicate roles with more conviction signal value:
+    - CFO/GC: 4 (highest - financial/legal officers rarely buy for PR)
+    - COO/VP: 3 (senior operators with deep business knowledge)
+    - CEO: 2 (sometimes buy for PR/signaling)
+    - Director/Officer: 1 (baseline insider)
     """
     title_u = (officer_title or "").upper()
     max_weight = 0
