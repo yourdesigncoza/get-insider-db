@@ -5,20 +5,21 @@ from datetime import date, timedelta
 from typing import Any, Dict, Optional
 
 import pandas as pd
-from sqlalchemy import inspect
+from sqlalchemy import inspect, select
 from sqlalchemy import text
 from sqlalchemy.engine import Engine
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from src.config import DATABASE_URL, get_engine
 from src.cluster_scoring import compute_cluster_score
 from src.exceptions import DataAccessError
-from src.insider_classification import get_or_create_insider_entity, normalize_insider_name
+from src.insider_classification import classify_insider_by_rules, normalize_insider_name
 from src.insider_roles import compute_insider_role_weight
 from src.analytics.feature_engineering import calculate_days_to_file, calculate_sale_to_purchase_ratio
 from src.analytics.window_detection import best_qualifying_window_indices
 from src.logging_config import get_logger
+from src.models import InsiderEntity
 
 logger = get_logger(__name__)
 
@@ -117,38 +118,92 @@ def _derive_flags(row: pd.Series) -> Dict[str, bool]:
 
 def _classify_insiders(base_df: pd.DataFrame, engine: Engine) -> Dict[str, Dict[str, Any]]:
     """
-    Ensure each normalized insider name has a cached classification in the DB.
-    Returns a map of normalized_name -> InsiderEntity.
+    Batch classify insiders - O(1) queries instead of O(n).
+    Returns a map of normalized_name -> classification dict.
     """
     if base_df.empty or "normalized_name" not in base_df:
         return {}
 
     unique_rows = base_df.drop_duplicates(subset=["normalized_name"])
-    log = logger.bind(operation="classify_insiders", unique_names=len(unique_rows))
-    log.debug("starting_classification")
+    unique_names = base_df["normalized_name"].dropna().unique().tolist()
+    if not unique_names:
+        return {}
+
+    log = logger.bind(operation="classify_insiders", unique_names=len(unique_names))
+    log.debug("starting_batch_classification")
 
     classifications: Dict[str, Dict[str, Any]] = {}
+
     with Session(bind=engine, expire_on_commit=False) as session:
-        for _, row in unique_rows.iterrows():
-            normalized = row.get("normalized_name") or ""
-            if not normalized:
+        # 1. Batch fetch existing entities (single SELECT ... WHERE IN (...))
+        stmt = select(InsiderEntity).where(
+            InsiderEntity.normalized_name.in_(unique_names)
+        )
+        existing = {e.normalized_name: e for e in session.scalars(stmt).all()}
+        log.debug("existing_entities_loaded", count=len(existing))
+
+        # 2. Identify names that need new entities
+        missing_names = set(unique_names) - set(existing.keys())
+
+        # 3. Create lookup from normalized_name -> row data
+        name_to_row = unique_rows.set_index("normalized_name")
+
+        # 4. Prepare new entities for missing names
+        to_create = []
+        for name in missing_names:
+            if name not in name_to_row.index:
                 continue
+            row = name_to_row.loc[name]
             flags = _derive_flags(row)
+
             insider_id = None
-            if "insider_cik" in row and pd.notna(row.get("insider_cik")):
+            if "insider_cik" in row.index and pd.notna(row.get("insider_cik")):
                 insider_id = str(row.get("insider_cik"))
-            entity = get_or_create_insider_entity(
-                session=session,
-                insider_name=row.get("insider_name", normalized),
-                officer_title=row.get("insider_title"),
-                flags=flags,
-                insider_id=insider_id,
+
+            rules_result = classify_insider_by_rules(
+                row.get("insider_name", name),
+                row.get("insider_title"),
+                flags,
             )
-            classifications[normalized] = {
+
+            entity = InsiderEntity(
+                insider_id=insider_id,
+                normalized_name=name,
+                entity_type=rules_result.get("entity_type", "unknown"),
+                is_fund_like=bool(rules_result.get("is_fund_like")),
+                source=rules_result.get("source", "rules"),
+                confidence=float(rules_result.get("confidence", 1.0)),
+            )
+            to_create.append(entity)
+            existing[name] = entity  # Add to cache for return dict
+
+        # 5. Bulk insert new entities
+        if to_create:
+            session.add_all(to_create)
+            try:
+                session.commit()
+                log.debug("entities_created", count=len(to_create))
+            except IntegrityError:
+                # Race condition: another process inserted same names
+                session.rollback()
+                log.warning("integrity_error_race_condition", count=len(to_create))
+                # Re-fetch to get the committed versions
+                retry_names = [e.normalized_name for e in to_create]
+                stmt = select(InsiderEntity).where(
+                    InsiderEntity.normalized_name.in_(retry_names)
+                )
+                for e in session.scalars(stmt).all():
+                    existing[e.normalized_name] = e
+
+        # 6. Build return dict
+        for name, entity in existing.items():
+            classifications[name] = {
                 "is_fund_like": bool(entity.is_fund_like),
                 "entity_type": entity.entity_type,
             }
-    log.info("classification_complete", classified=len(classifications))
+
+        log.info("batch_classification_complete", classified=len(classifications))
+
     return classifications
 
 
