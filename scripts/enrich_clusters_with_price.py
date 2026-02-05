@@ -29,13 +29,17 @@ from dotenv import load_dotenv
 from sqlalchemy import text
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 
-logger = logging.getLogger(__name__)
-
 # Import project config
 # Ensure root is in pythonpath if running as script
 sys.path.append(os.getcwd())
 from src.config import get_engine
 from src.cluster_scoring import compute_market_cap_adjusted_score
+from src.exceptions import EnrichmentError, InvalidTickerError, RateLimitError
+from src.logging_config import configure_logging, get_logger
+
+# Configure logging at module load
+configure_logging()
+logger = get_logger(__name__)
 
 # Load environment variables
 load_dotenv()
@@ -64,12 +68,6 @@ def _get_rate_limit() -> float:
 RATE_LIMIT_SECONDS = _get_rate_limit()
 REQUEST_LOCK = threading.Lock()
 LAST_REQUEST_TIME = 0.0
-
-class AlphaVantageError(Exception):
-    pass
-
-class InvalidTickerError(Exception):
-    pass
 
 
 @dataclass
@@ -277,8 +275,8 @@ def _get_price_history(ticker: str, start_date: datetime, end_date: datetime) ->
 
     except InvalidTickerError:
         raise
-    except Exception as e:
-        logger.warning(f"Error fetching history for {ticker}: {e}")
+    except (requests.RequestException, json.JSONDecodeError, KeyError, ValueError) as e:
+        logger.warning("api_request_failed", ticker=ticker, error=str(e), error_type=type(e).__name__)
         return []
 
 def _fetch_price_yfinance(ticker: str, target_date: date) -> Optional[float]:
@@ -316,8 +314,8 @@ def _fetch_price_yfinance(ticker: str, target_date: date) -> Optional[float]:
             logger.debug(f"YFinance: Used {closest_date} for {ticker} (requested {target_date})")
 
         return price
-    except Exception as e:
-        logger.error(f"YFinance fallback failed for {ticker}: {e}")
+    except (ValueError, KeyError, TypeError, AttributeError) as e:
+        logger.error("yfinance_fallback_failed", ticker=ticker, error=str(e), error_type=type(e).__name__)
         return None
 
 # -------------------------------------------------------------------------
@@ -552,8 +550,8 @@ def _get_fundamental_at_date(ticker: str, target_date: datetime, price_at_date: 
         for lim in limits_to_try:
             try:
                 records = _fetch_financial_metrics_from_api(ticker, FINANCIAL_METRICS_PERIOD, limit=lim)
-            except Exception as e:
-                logger.warning(f"Error fetching Financial Datasets AI financial metrics for {ticker}: {e}")
+            except (requests.RequestException, json.JSONDecodeError, KeyError) as e:
+                logger.warning("fundamentals_api_failed", ticker=ticker, limit=lim, error=str(e), error_type=type(e).__name__)
                 continue
 
             if not records:
@@ -622,8 +620,8 @@ def _get_fundamental_at_date(ticker: str, target_date: datetime, price_at_date: 
 
     except InvalidTickerError:
         raise
-    except Exception as e:
-        logger.warning(f"Error in fundamental logic for {ticker}: {e}")
+    except (ValueError, KeyError, TypeError) as e:
+        logger.warning("fundamental_processing_error", ticker=ticker, error=str(e), error_type=type(e).__name__)
         return None
 
 # -------------------------------------------------------------------------
@@ -725,10 +723,10 @@ def enrich_row(row: Dict[str, Any], stats: Optional[EnrichmentStats] = None) -> 
         except InvalidTickerError as e:
             enrichment_status = "unsupported_ticker"
             enrichment_errors.append(f"prices: {e}")
-        except Exception as e:
+        except (ValueError, KeyError, TypeError, AttributeError) as e:
             enrichment_status = "error"
             enrichment_errors.append(f"prices: {e}")
-            logger.error(f"Price fetch fatal error for {ticker}: {e}")
+            logger.error("price_fetch_fatal", ticker=ticker, error=str(e), error_type=type(e).__name__)
 
         try:
             fund_data = future_fundamentals.result()
@@ -736,7 +734,7 @@ def enrich_row(row: Dict[str, Any], stats: Optional[EnrichmentStats] = None) -> 
             if enrichment_status == "ok":
                 enrichment_status = "unsupported_ticker"
             enrichment_errors.append(f"fundamentals: {e}")
-        except Exception as e:
+        except (ValueError, KeyError, TypeError, AttributeError) as e:
             if enrichment_status == "ok":
                 enrichment_status = "partial"
             enrichment_errors.append(f"fundamentals: {e}")
@@ -851,8 +849,8 @@ def process_file(file_path: Path):
     try:
         content = file_path.read_text()
         data = json.loads(content)
-    except Exception as e:
-        logger.error(f"Error reading/parsing JSON: {e}")
+    except (OSError, json.JSONDecodeError) as e:
+        logger.error("json_parse_error", file=str(file_path), error=str(e), error_type=type(e).__name__)
         return
 
     if "rows" not in data:
