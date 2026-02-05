@@ -6,14 +6,13 @@ Uses tenacity library for robust retry logic.
 """
 
 import asyncio
-import logging
 from functools import wraps
 from typing import Callable, ParamSpec, TypeVar
 
 import aiohttp
 from tenacity import (
     AsyncRetrying,
-    before_sleep_log,
+    RetryCallState,
     retry,
     retry_if_exception,
     retry_if_exception_type,
@@ -21,7 +20,9 @@ from tenacity import (
     wait_exponential_jitter,
 )
 
-logger = logging.getLogger(__name__)
+from src.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 P = ParamSpec("P")
 T = TypeVar("T")
@@ -38,6 +39,21 @@ def _is_retryable_http_error(exc: BaseException) -> bool:
     if isinstance(exc, aiohttp.ClientResponseError):
         return exc.status in {429, 500, 502, 503, 504}
     return False
+
+
+def _before_sleep_structlog(retry_state: RetryCallState) -> None:
+    """Log retry attempts with structlog."""
+    exception = None
+    if retry_state.outcome is not None:
+        exc = retry_state.outcome.exception()
+        exception = str(exc) if exc else None
+
+    logger.warning(
+        "retry_attempt",
+        attempt=retry_state.attempt_number,
+        wait_seconds=round(retry_state.next_action.sleep, 2) if retry_state.next_action else None,
+        exception=exception,
+    )
 
 
 def async_retry(
@@ -80,7 +96,7 @@ def async_retry(
             | retry_if_exception_type(asyncio.TimeoutError)
             | retry_if_exception(_is_retryable_http_error)
         ),
-        before_sleep=before_sleep_log(logger, logging.WARNING),
+        before_sleep=_before_sleep_structlog,
         reraise=True,
     )
 
