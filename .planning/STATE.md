@@ -4,10 +4,10 @@
 
 **Milestone:** M1 — Codebase Remediation
 **Phase:** 04 in progress
-**Status:** Phase 04 Plan 02 complete
-**Last activity:** 2026-02-05 - Completed 04-02-PLAN.md
+**Status:** Phase 04 Plan 03 complete
+**Last activity:** 2026-02-05 - Completed 04-03-PLAN.md
 
-**Progress:** █████████████░░ (13/15 plans = 87%)
+**Progress:** ███████████████ (15/15 plans = 100%)
 
 ## Phase Status
 
@@ -16,7 +16,7 @@
 | 01 | Security Hardening & Data Integrity | 3 | 1 | ✓ Complete (verified) |
 | 02 | Architectural Stabilization & Observability | 4 | 2 | ✓ Complete (verified) |
 | 03 | Performance & Scaling | 4 | 3 | ✓ Complete (verified) |
-| 04 | Feature Completeness & Debt Cleanup | 4 | 1 | ◐ In Progress (2/4) |
+| 04 | Feature Completeness & Debt Cleanup | 4 | 1 | ✓ Complete |
 
 **Total:** 15 plans across 4 phases
 
@@ -75,6 +75,10 @@
 | 04-02 | JSONB for checkpoint tickers/errors | Flexible schema for structured data |
 | 04-02 | PostgreSQL upsert for checkpoint saves | Atomic updates without read-modify-write |
 | 04-02 | Default checkpoint frequency 25 rows | Balance I/O overhead vs data loss risk |
+| 04-03 | Remove deprecated _LEGACY_ROLE_WEIGHTS_FLOAT | Canonical weights in insider_roles.py |
+| 04-03 | Remove fetch_recent_buys | Duplicate SQL, cluster_buys.py is canonical |
+| 04-03 | Remove detect_clusters | Unused, cluster_buys.find_cluster_buys is canonical |
+| 04-03 | Keep ClusterConfig, InsiderBuy, ClusterEvent dataclasses | Still referenced elsewhere |
 
 ## Blockers
 
@@ -149,6 +153,7 @@ None
 **Plans:**
 - **Plan 04-01:** Complete - AI-powered insider classification with Claude Haiku
 - **Plan 04-02:** Complete - Enrichment checkpointing for crash recovery
+- **Plan 04-03:** Complete - Legacy code cleanup from cluster_service.py
 - **Plan 04-04:** Complete - Signal audit trail with SignalHistoryRecorder
 
 **Completed in 04-01:**
@@ -165,6 +170,13 @@ None
 - --no-resume flag for fresh starts
 - Tests: 12 passing for CRUD and SQL safety
 
+**Completed in 04-03:**
+- Removed _LEGACY_ROLE_WEIGHTS_FLOAT dictionary
+- Removed get_role_weight, fetch_recent_buys, detect_clusters functions
+- Removed run_backfill function and __main__ block
+- File reduced from 424 to 156 lines (63% reduction)
+- Tests: 90 passing (1.96s)
+
 **Completed in 04-04:**
 - signal_history table with FK to cluster_events
 - src/audit/ module with SignalHistoryRecorder class
@@ -174,8 +186,8 @@ None
 
 ## Session Continuity
 
-**Last session:** 2026-02-05 12:48:30 UTC
-**Stopped at:** Completed 04-02-PLAN.md
+**Last session:** 2026-02-05 15:23:00 UTC
+**Stopped at:** Completed 04-03-PLAN.md
 **Resume file:** None
 
 ## Notes
