@@ -24,6 +24,11 @@ from sqlalchemy import text
 
 from src.config import get_engine
 from src.analytics.cluster_buys import find_tradeable_cluster_signals
+from src.exceptions import EnrichmentError, DataAccessError
+from src.logging_config import configure_logging, get_logger
+
+configure_logging()
+logger = get_logger(__name__)
 
 
 def _parse_date(value: str) -> date:
@@ -50,7 +55,7 @@ def _load_enrichment_index(path: Path) -> tuple[Dict[tuple[str, date], Dict[str,
         if isinstance(entry_date, str):
             try:
                 entry_date = _parse_date(entry_date)
-            except Exception:
+            except ValueError:
                 entry_date = None
         if isinstance(entry_date, date):
             by_event[(ticker, entry_date)] = row
@@ -272,7 +277,7 @@ def main() -> None:
             if isinstance(entry_date, str):
                 try:
                     entry_date = _parse_date(entry_date)
-                except Exception:
+                except ValueError:
                     entry_date = None
             enriched = None
             if ticker and isinstance(entry_date, date):
