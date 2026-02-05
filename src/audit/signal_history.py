@@ -20,6 +20,7 @@ EVENT_TYPES = frozenset({
 ACTORS = frozenset({
     "system",
     "enrichment",
+    "async_enrichment",
     "manual",
     "decay_job",
     "backtest",
