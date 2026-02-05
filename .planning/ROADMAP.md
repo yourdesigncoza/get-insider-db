@@ -23,15 +23,16 @@ Plans:
 ### Phase 02: Architectural Stabilization & Observability
 **Goal:** Remove fragile code, standardize data access, enable debugging
 
-**Tasks:**
-- P1: Standardize data access layer (unified SQLAlchemy ORM)
-- P1: Fix N+1 query pattern (batch load insiders)
-- P1: Global error handling (structured logging, specific exceptions)
-- P1: Database indexing (ticker, filing_date on Form345)
-- P2: Data quality monitoring (post-enrichment validation)
+**Plans:** 4 plans
+
+Plans:
+- [ ] 02-01-PLAN.md - Exception hierarchy and cluster_buys.py error handling
+- [ ] 02-02-PLAN.md - Structured logging with structlog
+- [ ] 02-03-PLAN.md - N+1 query fix (batch insider classification)
+- [ ] 02-04-PLAN.md - Script exception cleanup (enrich, backtest)
 
 **Depends on:** Phase 01 SQL fixes
-**Verification:** Single data access pattern, no N+1 in logs, specific exception types
+**Verification:** No bare `except Exception`, structured logs, batch queries, specific exception types
 
 ---
 
