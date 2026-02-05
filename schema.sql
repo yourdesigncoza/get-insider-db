@@ -724,6 +724,33 @@ ALTER TABLE public.enrichment_checkpoints OWNER TO myuser;
 CREATE INDEX IF NOT EXISTS idx_checkpoint_updated ON public.enrichment_checkpoints (updated_at);
 
 
+--
+-- Signal audit trail (event-sourced, immutable)
+--
+
+CREATE TABLE IF NOT EXISTS public.signal_history (
+    id bigserial PRIMARY KEY,
+    cluster_id bigint NOT NULL REFERENCES public.cluster_events(cluster_id) ON DELETE CASCADE,
+    event_type text NOT NULL,  -- 'created', 'status_changed', 'score_updated', 'enriched', 'invalidated'
+    changed_by text NOT NULL,  -- 'system', 'enrichment', 'manual', 'decay_job', 'backtest'
+    old_values jsonb,          -- Previous state (null for 'created')
+    new_values jsonb,          -- New state
+    reason text,               -- Optional explanation
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+ALTER TABLE public.signal_history OWNER TO myuser;
+
+-- Indexes for efficient querying
+CREATE INDEX IF NOT EXISTS idx_signal_history_cluster ON public.signal_history (cluster_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_signal_history_event ON public.signal_history (event_type, created_at);
+CREATE INDEX IF NOT EXISTS idx_signal_history_changed_by ON public.signal_history (changed_by, created_at);
+
+COMMENT ON TABLE public.signal_history IS 'Append-only audit trail for cluster signal lifecycle events';
+COMMENT ON COLUMN public.signal_history.event_type IS 'created|status_changed|score_updated|enriched|invalidated';
+COMMENT ON COLUMN public.signal_history.changed_by IS 'Actor: system|enrichment|manual|decay_job|backtest';
+
+
 -- Completed on 2026-01-26 21:30:56 SAST
 
 --
