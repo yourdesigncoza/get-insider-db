@@ -95,13 +95,15 @@ Plans:
 
 ### Phase 06: Production Integration Cleanup
 **Goal:** Integrate orphaned modules, fix logging/exception inconsistencies
-**Status:** Pending
+**Status:** Planned
 **Gap Closure:** Closes tech debt from M1 audit
 
+**Plans:** 3 plans (1 wave, all parallel)
+
 Plans:
-- [ ] 06-01-PLAN.md - SignalHistoryRecorder integration into enrichment pipeline
-- [ ] 06-02-PLAN.md - Structured logging in async modules
-- [ ] 06-03-PLAN.md - Exception type utilization (raise EnrichmentError, RateLimitError)
+- [ ] 06-01-PLAN.md — SignalHistoryRecorder integration into async enrichment pipeline
+- [ ] 06-02-PLAN.md — Structured logging in async_client modules (stdlib -> structlog)
+- [ ] 06-03-PLAN.md — Exception type utilization (RateLimitError, EnrichmentError)
 
 **Depends on:** Phase 05 async parity
 **Closes:**
