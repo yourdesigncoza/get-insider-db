@@ -3,11 +3,11 @@
 ## Current Position
 
 **Milestone:** M1 — Codebase Remediation
-**Phase:** 02 in progress
-**Status:** Plan 02-04 complete, Phase 02 COMPLETE
-**Last activity:** 2026-02-05 - Completed 02-04-PLAN.md
+**Phase:** 03 in progress
+**Status:** Plan 03-02 complete
+**Last activity:** 2026-02-05 - Completed 03-02-PLAN.md
 
-**Progress:** ███████░░░░░░░░ (7/15 plans = 47%)
+**Progress:** ████████░░░░░░░ (8/15 plans = 53%)
 
 ## Phase Status
 
@@ -15,7 +15,7 @@
 |-------|------|-------|-------|--------|
 | 01 | Security Hardening & Data Integrity | 3 | 1 | ✓ Complete (verified) |
 | 02 | Architectural Stabilization & Observability | 4 | 2 | ✓ Complete (verified) |
-| 03 | Performance & Scaling | 4 | 3 | ○ Planned |
+| 03 | Performance & Scaling | 4 | 3 | ◐ In Progress (2/4) |
 | 04 | Feature Completeness & Debt Cleanup | 4 | 1 | ○ Planned |
 
 **Total:** 15 plans across 4 phases
@@ -55,6 +55,9 @@
 | 02-04 | Replace bare Exception with specific types | Enable diagnosable errors in enrichment/backtest scripts |
 | 02-04 | Structured logging for all error paths | Add ticker, error_type context for production observability |
 | 02-04 | ImportError for optional dependencies | More specific than Exception for graceful degradation |
+| 03-02 | Use ijson.items('rows.item') for streaming | Native streaming without custom parsing |
+| 03-02 | Default batch_size=50 | Balance memory consumption vs processing overhead |
+| 03-02 | Support file paths and file-like objects | Flexibility for testing and production use |
 
 ## Blockers
 
@@ -80,15 +83,27 @@ None
 **Plans:**
 - **Plan 02-01:** Complete - Exception hierarchy with 6 classes
 - **Plan 02-02:** Complete - Structured logging with structlog
-- **Plan 02-03:** Complete - N+1 query fix (O(n)→O(1))
+- **Plan 02-03:** Complete - N+1 query fix (O(n)->O(1))
 - **Plan 02-04:** Complete - Script exception cleanup
 
-**Next Phase:** 03 - Performance & Scaling
+## Phase 03 Progress
+
+**Plans:**
+- **Plan 03-01:** Pending - Database indexing
+- **Plan 03-02:** Complete - Streaming JSON module with ijson
+- **Plan 03-03:** Pending - Async price enricher
+- **Plan 03-04:** Pending - Async batch classification
+
+**Completed in 03-02:**
+- src/services/streaming.py with ijson-based streaming
+- O(1) memory consumption for large cluster files
+- batch_clusters() and process_batches() utilities
+- Tests: 28/28 passing (0.64s)
 
 ## Session Continuity
 
-**Last session:** 2026-02-05 11:27:01 UTC
-**Stopped at:** Completed 02-04-PLAN.md (Phase 02 complete)
+**Last session:** 2026-02-05 12:10:00 UTC
+**Stopped at:** Completed 03-02-PLAN.md
 **Resume file:** None
 
 ## Notes
@@ -98,3 +113,5 @@ Planning completed: 2026-02-05
 Phase 01 executed: 2026-02-05
 Phase 01 verified: 2026-02-05
 Phase 02 started: 2026-02-05
+Phase 02 completed: 2026-02-05
+Phase 03 started: 2026-02-05
