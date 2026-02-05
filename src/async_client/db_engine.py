@@ -16,6 +16,9 @@ from sqlalchemy.ext.asyncio import (
 )
 
 from src.config import DATABASE_URL
+from src.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 def _convert_to_async_url(url: str) -> str:
@@ -55,13 +58,15 @@ def get_async_engine(
     """
     async_url = _convert_to_async_url(DATABASE_URL)
 
-    return create_async_engine(
+    engine = create_async_engine(
         async_url,
         pool_size=pool_size,
         max_overflow=max_overflow,
         pool_pre_ping=True,  # Validate connections before use
         pool_recycle=3600,  # Recycle connections after 1 hour
     )
+    logger.debug("async_engine_created", pool_size=pool_size, max_overflow=max_overflow)
+    return engine
 
 
 def async_session_factory() -> async_sessionmaker[AsyncSession]:
@@ -92,3 +97,4 @@ async def dispose_engine() -> None:
     """
     engine = get_async_engine()
     await engine.dispose()
+    logger.debug("async_engine_disposed")
