@@ -4,10 +4,10 @@
 
 **Milestone:** M1 — Codebase Remediation
 **Phase:** 03 in progress
-**Status:** Plan 03-02 complete
-**Last activity:** 2026-02-05 - Completed 03-02-PLAN.md
+**Status:** Plan 03-01 and 03-02 complete
+**Last activity:** 2026-02-05 - Completed 03-01-PLAN.md
 
-**Progress:** ████████░░░░░░░ (8/15 plans = 53%)
+**Progress:** █████████░░░░░░ (9/15 plans = 60%)
 
 ## Phase Status
 
@@ -15,7 +15,7 @@
 |-------|------|-------|-------|--------|
 | 01 | Security Hardening & Data Integrity | 3 | 1 | ✓ Complete (verified) |
 | 02 | Architectural Stabilization & Observability | 4 | 2 | ✓ Complete (verified) |
-| 03 | Performance & Scaling | 4 | 3 | ◐ In Progress (2/4) |
+| 03 | Performance & Scaling | 4 | 3 | ◐ In Progress (2/4 complete) |
 | 04 | Feature Completeness & Debt Cleanup | 4 | 1 | ○ Planned |
 
 **Total:** 15 plans across 4 phases
@@ -55,6 +55,10 @@
 | 02-04 | Replace bare Exception with specific types | Enable diagnosable errors in enrichment/backtest scripts |
 | 02-04 | Structured logging for all error paths | Add ticker, error_type context for production observability |
 | 02-04 | ImportError for optional dependencies | More specific than Exception for graceful degradation |
+| 03-01 | TCPConnector pooling with configurable limits | Balance throughput vs resource usage (50 total, 10 per host) |
+| 03-01 | Semaphore-based rate limiting | Prevent API hammering (default 10 concurrent) |
+| 03-01 | Singleton async engine via lru_cache | Consistent with sync config.py pattern |
+| 03-01 | Retry on 429 + 5xx with jitter | Standard transient error handling |
 | 03-02 | Use ijson.items('rows.item') for streaming | Native streaming without custom parsing |
 | 03-02 | Default batch_size=50 | Balance memory consumption vs processing overhead |
 | 03-02 | Support file paths and file-like objects | Flexibility for testing and production use |
@@ -89,10 +93,16 @@ None
 ## Phase 03 Progress
 
 **Plans:**
-- **Plan 03-01:** Pending - Database indexing
+- **Plan 03-01:** Complete - Async client infrastructure
 - **Plan 03-02:** Complete - Streaming JSON module with ijson
 - **Plan 03-03:** Pending - Async price enricher
 - **Plan 03-04:** Pending - Async batch classification
+
+**Completed in 03-01:**
+- src/async_client/ module with HTTP client, DB engine, retry decorators
+- AsyncHTTPClient with aiohttp TCPConnector pooling (50 connections, 10 per host)
+- Async DB engine factory with asyncpg driver
+- async_retry decorator with exponential backoff + jitter
 
 **Completed in 03-02:**
 - src/services/streaming.py with ijson-based streaming
@@ -102,8 +112,8 @@ None
 
 ## Session Continuity
 
-**Last session:** 2026-02-05 12:10:00 UTC
-**Stopped at:** Completed 03-02-PLAN.md
+**Last session:** 2026-02-05 12:14:00 UTC
+**Stopped at:** Completed 03-01-PLAN.md
 **Resume file:** None
 
 ## Notes
