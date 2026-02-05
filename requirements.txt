@@ -10,3 +10,4 @@ datasets
 requests
 python-dateutil
 tenacity
+yfinance

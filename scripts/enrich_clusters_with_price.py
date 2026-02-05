@@ -11,20 +11,24 @@ Uses concurrent.futures for parallel fetching.
 import argparse
 import concurrent.futures
 import json
+import logging
 import os
 import sys
 import time
 import threading
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from functools import lru_cache
 from pathlib import Path
 from typing import Optional, Dict, Any, List
 
 import requests
+import yfinance as yf
 from dateutil.relativedelta import relativedelta
 from dotenv import load_dotenv
 from sqlalchemy import text
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+
+logger = logging.getLogger(__name__)
 
 # Import project config
 # Ensure root is in pythonpath if running as script
@@ -43,7 +47,20 @@ FINANCIAL_METRICS_MAX_LIMIT = int(os.getenv("FINANCIAL_METRICS_MAX_LIMIT", "200"
 PRICE_LOOKAHEAD_BUFFER_DAYS = int(os.getenv("PRICE_LOOKAHEAD_BUFFER_DAYS", "10"))
 
 # Global Rate Limiting
-RATE_LIMIT_SECONDS = 0.0
+# Default 0.5s (2 req/sec), minimum 0.1s (10 req/sec) for safety
+DEFAULT_RATE_LIMIT = 0.5
+MIN_RATE_LIMIT = 0.1
+
+def _get_rate_limit() -> float:
+    """Get rate limit with enforced minimum."""
+    env_value = os.getenv("RATE_LIMIT_SECONDS", str(DEFAULT_RATE_LIMIT))
+    try:
+        value = float(env_value)
+        return max(value, MIN_RATE_LIMIT)
+    except ValueError:
+        return DEFAULT_RATE_LIMIT
+
+RATE_LIMIT_SECONDS = _get_rate_limit()
 REQUEST_LOCK = threading.Lock()
 LAST_REQUEST_TIME = 0.0
 
