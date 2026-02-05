@@ -3,11 +3,12 @@
 ## Current Position
 
 **Milestone:** M1 — Codebase Remediation
-**Phase:** 04 complete, gap closure phases 05-06 added
-**Status:** Gap closure phases created from M1 audit
-**Last activity:** 2026-02-05 - Added phases 05-06 to close audit gaps
+**Phase:** 05 of 6 (Async Enricher Parity)
+**Plan:** 2 of 2 complete
+**Status:** Phase 05 complete
+**Last activity:** 2026-02-05 - Completed 05-02-PLAN.md (checkpoint integration)
 
-**Progress:** ███████████░░░░ (15/20 plans = 75%)
+**Progress:** █████████████░░ (17/20 plans = 85%)
 
 ## Phase Status
 
@@ -17,7 +18,7 @@
 | 02 | Architectural Stabilization & Observability | 4 | 2 | ✓ Complete (verified) |
 | 03 | Performance & Scaling | 4 | 3 | ✓ Complete (verified) |
 | 04 | Feature Completeness & Debt Cleanup | 4 | 1 | ✓ Complete (verified) |
-| 05 | Async Enricher Parity | 2 | 1 | Pending |
+| 05 | Async Enricher Parity | 2 | 1 | ✓ Complete |
 | 06 | Production Integration Cleanup | 3 | 1 | Pending |
 
 **Total:** 20 plans across 6 phases
@@ -81,6 +82,9 @@
 | 04-03 | Remove fetch_recent_buys | Duplicate SQL, cluster_buys.py is canonical |
 | 04-03 | Remove detect_clusters | Unused, cluster_buys.find_cluster_buys is canonical |
 | 04-03 | Keep ClusterConfig, InsiderBuy, ClusterEvent dataclasses | Still referenced elsewhere |
+| 05-02 | CHECKPOINT_FREQUENCY = 25 for async | Match sync script default for consistency |
+| 05-02 | Streaming mode excluded from checkpointing | Cannot resume mid-stream without full re-parse |
+| 05-02 | Run ID format: async_enrich_{file_stem} | Unique per input file, distinguishes from sync |
 
 ## Blockers
 
@@ -193,10 +197,29 @@ None
 - Append-only design (no update/delete operations)
 - Tests: 21 passing for validation, CRUD, immutability
 
+## Phase 05 Verification Summary
+
+- **Score:** 4/4 must-haves verified (100%)
+- **Tests:** 7 new tests for checkpoint integration
+- **Parity achieved:** YFinance fallback + checkpointing now in async script
+
+**Plans:**
+- **Plan 05-01:** Complete - YFinance async fallback in AsyncEnricher
+- **Plan 05-02:** Complete - Checkpoint integration for crash recovery
+
+**Completed in 05-02:**
+- CheckpointManager integration in enrich_small_file()
+- Resume from checkpoint logic with start_index calculation
+- Periodic saves every 25 clusters (CHECKPOINT_FREQUENCY)
+- Clear checkpoint on successful completion
+- --no-resume CLI flag for fresh starts
+- Streaming mode explicitly excluded from checkpointing
+- Tests: 7 passing for checkpoint behavior
+
 ## Session Continuity
 
-**Last session:** 2026-02-05 16:00:00 UTC
-**Stopped at:** Milestone 1 complete - all 4 phases verified
+**Last session:** 2026-02-05 13:43:00 UTC
+**Stopped at:** Completed 05-02-PLAN.md (checkpoint integration)
 **Resume file:** None
 
 ## Notes
@@ -212,3 +235,5 @@ Phase 03 completed: 2026-02-05
 Phase 04 started: 2026-02-05
 Phase 04 completed: 2026-02-05
 Milestone 1 complete: 2026-02-05
+Phase 05 started: 2026-02-05
+Phase 05 completed: 2026-02-05
