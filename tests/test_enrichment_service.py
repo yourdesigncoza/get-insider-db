@@ -1,11 +1,11 @@
 """
 Unit tests for AsyncEnricher enrichment service.
 
-Tests cover happy path, cache hits, API errors, and batch processing.
+Tests cover happy path, cache hits, API errors, batch processing, and YFinance fallback.
 All API calls are mocked to avoid real network requests.
 """
 import asyncio
-from datetime import datetime
+from datetime import datetime, date
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import aiohttp
@@ -220,7 +220,8 @@ class TestAsyncEnricher:
         ) as mock_get_prices, patch.object(
             AsyncEnricher, "get_fundamentals", new_callable=AsyncMock
         ) as mock_get_fund:
-            mock_get_prices.return_value = mock_prices
+            # get_price_history now returns (prices, used_yfinance_fallback)
+            mock_get_prices.return_value = (mock_prices, False)
             mock_get_fund.return_value = mock_fundamentals
 
             async with AsyncEnricher(api_key=TEST_API_KEY) as enricher:
@@ -231,6 +232,7 @@ class TestAsyncEnricher:
             assert result["price_at_entry"] == 150.0
             assert result["market_cap_at_entry"] == 2500000000000
             assert result["pe_ratio_at_entry"] == 28.5
+            assert result["used_yfinance_fallback"] is False
             assert "return_1m" in result
             assert "return_2m" in result
             assert "return_3m" in result
@@ -404,7 +406,8 @@ class TestAsyncEnricher:
         ) as mock_prices, patch.object(
             AsyncEnricher, "get_fundamentals", new_callable=AsyncMock
         ) as mock_fund:
-            mock_prices.return_value = []  # No price data
+            # get_price_history returns (prices, used_fallback)
+            mock_prices.return_value = ([], False)  # No price data
             mock_fund.return_value = None
 
             async with AsyncEnricher(api_key=TEST_API_KEY) as enricher:
@@ -430,7 +433,8 @@ class TestAsyncEnricherIntegration:
         ) as mock_get_prices, patch.object(
             AsyncEnricher, "get_fundamentals", new_callable=AsyncMock
         ) as mock_get_fund:
-            mock_get_prices.return_value = mock_prices
+            # get_price_history returns (prices, used_yfinance_fallback)
+            mock_get_prices.return_value = (mock_prices, False)
             mock_get_fund.return_value = mock_fundamentals
 
             async with AsyncEnricher(api_key=TEST_API_KEY) as enricher:
@@ -440,6 +444,7 @@ class TestAsyncEnricherIntegration:
             expected_fields = [
                 "enrichment_status",
                 "enrichment_errors",
+                "used_yfinance_fallback",
                 "price_at_entry",
                 "market_cap_at_entry",
                 "enterprise_value_at_entry",
@@ -481,7 +486,8 @@ class TestAsyncEnricherIntegration:
         ) as mock_get_prices, patch.object(
             AsyncEnricher, "get_fundamentals", new_callable=AsyncMock
         ) as mock_get_fund:
-            mock_get_prices.return_value = mock_prices
+            # get_price_history returns (prices, used_yfinance_fallback)
+            mock_get_prices.return_value = (mock_prices, False)
             mock_get_fund.return_value = None
 
             async with AsyncEnricher(api_key=TEST_API_KEY) as enricher:
@@ -491,3 +497,154 @@ class TestAsyncEnricherIntegration:
             for i, result in enumerate(results):
                 assert result["order_id"] == i
                 assert result["ticker"] == f"TICK{i}"
+
+
+# -------------------------------------------------------------------------
+# YFINANCE FALLBACK TESTS
+# -------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio(loop_scope="function")
+class TestYFinanceFallback:
+    """Tests for YFinance fallback behavior in AsyncEnricher."""
+
+    async def test_yfinance_fallback_on_empty_api_response(self, mock_cluster):
+        """Test that YFinance fallback triggers when API returns empty prices."""
+        with patch.object(
+            AsyncEnricher, "_check_price_cache", new_callable=AsyncMock
+        ) as mock_cache, patch.object(
+            AsyncEnricher, "_fetch_prices_from_api", new_callable=AsyncMock
+        ) as mock_api, patch.object(
+            AsyncEnricher, "_fetch_price_yfinance_sync"
+        ) as mock_yf_sync, patch.object(
+            AsyncEnricher, "_save_prices_to_cache", new_callable=AsyncMock
+        ) as mock_save:
+            # Cache returns empty, API returns empty
+            mock_cache.return_value = []
+            mock_api.return_value = []
+            # YFinance returns a price
+            mock_yf_sync.return_value = 100.0
+
+            async with AsyncEnricher(api_key=TEST_API_KEY) as enricher:
+                prices, used_fallback = await enricher.get_price_history(
+                    "AAPL",
+                    datetime(2024, 1, 16),
+                    datetime(2024, 4, 16),
+                )
+
+            # Verify fallback was triggered
+            assert used_fallback is True
+            assert len(prices) == 1
+            assert prices[0]["close"] == 100.0
+            mock_yf_sync.assert_called_once()
+
+    async def test_yfinance_fallback_not_called_when_api_succeeds(self, mock_cluster, mock_prices):
+        """Test that YFinance fallback is NOT called when API returns data."""
+        with patch.object(
+            AsyncEnricher, "_check_price_cache", new_callable=AsyncMock
+        ) as mock_cache, patch.object(
+            AsyncEnricher, "_fetch_prices_from_api", new_callable=AsyncMock
+        ) as mock_api, patch.object(
+            AsyncEnricher, "_fetch_price_yfinance_sync"
+        ) as mock_yf_sync, patch.object(
+            AsyncEnricher, "_save_prices_to_cache", new_callable=AsyncMock
+        ):
+            # Cache empty, API returns valid prices
+            mock_cache.return_value = []
+            mock_api.return_value = mock_prices
+
+            async with AsyncEnricher(api_key=TEST_API_KEY) as enricher:
+                prices, used_fallback = await enricher.get_price_history(
+                    "AAPL",
+                    datetime(2024, 1, 16),
+                    datetime(2024, 4, 16),
+                )
+
+            # Verify fallback was NOT called
+            assert used_fallback is False
+            assert len(prices) == len(mock_prices)
+            mock_yf_sync.assert_not_called()
+
+    async def test_yfinance_async_wrapper_uses_to_thread(self, mock_cluster):
+        """Test that _fetch_price_yfinance_async uses asyncio.to_thread."""
+        with patch("src.services.enrichment_service.asyncio.to_thread", new_callable=AsyncMock) as mock_to_thread:
+            mock_to_thread.return_value = 150.0
+
+            async with AsyncEnricher(api_key=TEST_API_KEY) as enricher:
+                result = await enricher._fetch_price_yfinance_async("AAPL", date(2024, 1, 16))
+
+            # Verify to_thread was used with the sync method
+            mock_to_thread.assert_called_once()
+            call_args = mock_to_thread.call_args
+            # First arg should be the sync method
+            assert call_args[0][0] == enricher._fetch_price_yfinance_sync
+            # Second arg should be ticker
+            assert call_args[0][1] == "AAPL"
+            # Third arg should be date
+            assert call_args[0][2] == date(2024, 1, 16)
+            assert result == 150.0
+
+    async def test_enrich_cluster_tracks_fallback_usage(self, mock_cluster, mock_fundamentals):
+        """Test that enrich_cluster tracks when YFinance fallback is used."""
+        fallback_prices = [{"date": datetime(2024, 1, 16), "close": 100.0}]
+
+        with patch.object(
+            AsyncEnricher, "get_price_history", new_callable=AsyncMock
+        ) as mock_get_prices, patch.object(
+            AsyncEnricher, "get_fundamentals", new_callable=AsyncMock
+        ) as mock_get_fund:
+            # Simulate YFinance fallback was used
+            mock_get_prices.return_value = (fallback_prices, True)
+            mock_get_fund.return_value = mock_fundamentals
+
+            async with AsyncEnricher(api_key=TEST_API_KEY) as enricher:
+                result = await enricher.enrich_cluster(mock_cluster)
+
+            # Verify fallback tracking in output
+            assert result["used_yfinance_fallback"] is True
+            assert result["enrichment_status"] == "ok"
+            assert result["price_at_entry"] == 100.0
+
+    async def test_yfinance_fallback_returns_none_on_exception(self):
+        """Test that YFinance fallback returns None when exception occurs."""
+        with patch("src.services.enrichment_service.asyncio.to_thread", new_callable=AsyncMock) as mock_to_thread:
+            mock_to_thread.side_effect = Exception("Network error")
+
+            async with AsyncEnricher(api_key=TEST_API_KEY) as enricher:
+                result = await enricher._fetch_price_yfinance_async("AAPL", date(2024, 1, 16))
+
+            assert result is None
+
+    async def test_yfinance_fallback_not_used_when_cache_has_data(self, mock_cluster):
+        """Test that YFinance is not called when cache has sufficient data for short period."""
+        # Create enough cached prices for a short period
+        cached_prices = [
+            {"date": datetime(2024, 1, 14), "close": 148.0},
+            {"date": datetime(2024, 1, 15), "close": 149.0},
+            {"date": datetime(2024, 1, 16), "close": 150.0},
+            {"date": datetime(2024, 1, 17), "close": 151.0},
+            {"date": datetime(2024, 1, 18), "close": 152.0},
+        ]
+        with patch.object(
+            AsyncEnricher, "_check_price_cache", new_callable=AsyncMock
+        ) as mock_cache, patch.object(
+            AsyncEnricher, "_fetch_prices_from_api", new_callable=AsyncMock
+        ) as mock_api, patch.object(
+            AsyncEnricher, "_fetch_price_yfinance_sync"
+        ) as mock_yf_sync:
+            # Cache has sufficient data for a short 3-day period
+            mock_cache.return_value = cached_prices
+
+            async with AsyncEnricher(api_key=TEST_API_KEY) as enricher:
+                # Request a short period where cache suffices (days_needed <= 5)
+                prices, used_fallback = await enricher.get_price_history(
+                    "AAPL",
+                    datetime(2024, 1, 16),
+                    datetime(2024, 1, 18),  # Only 2 days needed
+                )
+
+            # YFinance should not be called
+            assert used_fallback is False
+            mock_yf_sync.assert_not_called()
+            # For short periods with cache, API may or may not be called depending on heuristics
+            # but the key assertion is that YFinance fallback was not needed
