@@ -2,13 +2,13 @@
 
 ## Current Position
 
-**Milestone:** M1 - Codebase Remediation
-**Phase:** 06 of 6 (Production Integration Cleanup)
-**Plan:** 3 of 3 complete
-**Status:** Phase 06 complete
-**Last activity:** 2026-02-05 - Completed 06-03-PLAN.md (exception type wiring)
+**Milestone:** v1.0 shipped — planning next milestone
+**Phase:** None active
+**Plan:** None active
+**Status:** Ready to plan
+**Last activity:** 2026-02-05 - v1.0 milestone shipped
 
-**Progress:** ████████████████ (20/20 plans = 100%)
+**Progress:** ✓ v1.0 complete (6 phases, 20 plans)
 
 ## Phase Status
 
