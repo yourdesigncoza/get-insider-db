@@ -8,10 +8,12 @@ import pandas as pd
 from sqlalchemy import inspect
 from sqlalchemy import text
 from sqlalchemy.engine import Engine
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from src.config import DATABASE_URL, get_engine
 from src.cluster_scoring import compute_cluster_score
+from src.exceptions import DataAccessError
 from src.insider_classification import get_or_create_insider_entity, normalize_insider_name
 from src.insider_roles import compute_insider_role_weight
 from src.analytics.feature_engineering import calculate_days_to_file, calculate_sale_to_purchase_ratio
@@ -39,8 +41,8 @@ def _first_nonempty_any(series: pd.Series) -> str:
         try:
             if pd.isna(value):
                 continue
-        except Exception:
-            pass
+        except (TypeError, ValueError):
+            pass  # Non-comparable type, skip
         text_value = str(value).strip()
         if text_value:
             return text_value
@@ -53,8 +55,8 @@ def _get_optional_column(engine: Engine, table: str, candidates: tuple[str, ...]
     """
     try:
         cols = {col["name"] for col in inspect(engine).get_columns(table)}
-    except Exception:
-        return None
+    except SQLAlchemyError:
+        return None  # Table introspection failed
     for name in candidates:
         if name in cols:
             return name
@@ -88,8 +90,8 @@ def _flag_value(value: object) -> bool:
     try:
         if pd.isna(value):
             return False
-    except Exception:
-        pass
+    except (TypeError, ValueError):
+        pass  # Non-comparable type
     if isinstance(value, (int, float)):
         return bool(value)
     return str(value).strip().lower() in {"1", "true", "t", "yes", "y"}
@@ -160,8 +162,8 @@ def _get_engine() -> Engine:
         raise RuntimeError("DATABASE_URL is not set; configure it in .env")
     try:
         return get_engine()
-    except Exception as exc:  # pragma: no cover - passthrough for clarity
-        raise RuntimeError(f"Failed to create engine for DATABASE_URL: {exc}") from exc
+    except SQLAlchemyError as exc:  # pragma: no cover - passthrough for clarity
+        raise DataAccessError(f"Failed to create engine: {exc}", {"url": DATABASE_URL[:30]}) from exc
 
 
 def get_latest_filing_date() -> date:
