@@ -11,3 +11,5 @@ requests
 python-dateutil
 tenacity
 yfinance
+pre-commit
+detect-secrets

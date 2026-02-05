@@ -1,0 +1,40 @@
+# Pre-commit hooks for secret detection and code quality
+# Install: pre-commit install
+# Run manually: pre-commit run --all-files
+
+repos:
+  # Standard hooks for common issues
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: check-added-large-files
+        args: ['--maxkb=1000']
+      - id: check-yaml
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+      - id: check-merge-conflict
+      - id: check-json
+        exclude: '.*/\..*'
+
+  # Secret detection using Yelp's detect-secrets
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.5.0
+    hooks:
+      - id: detect-secrets
+        args: ['--baseline', '.secrets.baseline']
+        exclude: |
+          (?x)^(
+            package-lock\.json|
+            .*\.lock|
+            \.secrets\.baseline
+          )$
+
+  # Local hook to explicitly block .env files
+  - repo: local
+    hooks:
+      - id: check-env-files
+        name: Block .env files
+        entry: bash -c 'git diff --cached --name-only | grep -E "^\.env" && echo "ERROR: .env file detected in commit - remove from staging" && exit 1 || exit 0'
+        language: system
+        pass_filenames: false
+        stages: [commit]
