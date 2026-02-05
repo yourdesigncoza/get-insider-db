@@ -224,7 +224,8 @@ class TestEnrichmentOutputSchema:
         ) as mock_get_prices, patch.object(
             AsyncEnricher, "get_fundamentals", new_callable=AsyncMock
         ) as mock_get_fund:
-            mock_get_prices.return_value = mock_prices
+            # get_price_history returns (prices, used_yfinance_fallback)
+            mock_get_prices.return_value = (mock_prices, False)
             mock_get_fund.return_value = mock_fundamentals
 
             clusters = list(stream_clusters(sample_export_file))
@@ -247,7 +248,8 @@ class TestEnrichmentOutputSchema:
         ) as mock_get_prices, patch.object(
             AsyncEnricher, "get_fundamentals", new_callable=AsyncMock
         ) as mock_get_fund:
-            mock_get_prices.return_value = []
+            # get_price_history returns (prices, used_yfinance_fallback)
+            mock_get_prices.return_value = ([], False)
             mock_get_fund.return_value = None
 
             clusters = list(stream_clusters(sample_export_file))

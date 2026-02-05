@@ -18,7 +18,7 @@ from sqlalchemy import text
 
 from src.async_client import AsyncHTTPClient, async_session_factory, async_retry
 from src.cluster_scoring import compute_market_cap_adjusted_score
-from src.exceptions import InvalidTickerError
+from src.exceptions import EnrichmentError, InvalidTickerError, RateLimitError
 
 logger = structlog.get_logger(__name__)
 
@@ -783,6 +783,9 @@ class AsyncEnricher:
         if isinstance(results[0], InvalidTickerError):
             enrichment_status = "unsupported_ticker"
             enrichment_errors.append(f"prices: {results[0]}")
+        elif isinstance(results[0], RateLimitError):
+            enrichment_status = "rate_limited"
+            enrichment_errors.append(f"prices: rate limit - {results[0]}")
         elif isinstance(results[0], Exception):
             enrichment_status = "error"
             enrichment_errors.append(f"prices: {results[0]}")
@@ -794,6 +797,10 @@ class AsyncEnricher:
             if enrichment_status == "ok":
                 enrichment_status = "unsupported_ticker"
             enrichment_errors.append(f"fundamentals: {results[1]}")
+        elif isinstance(results[1], RateLimitError):
+            if enrichment_status == "ok":
+                enrichment_status = "rate_limited"
+            enrichment_errors.append(f"fundamentals: rate limit - {results[1]}")
         elif isinstance(results[1], Exception):
             if enrichment_status == "ok":
                 enrichment_status = "partial"
@@ -895,10 +902,18 @@ class AsyncEnricher:
         enriched = []
         for i, result in enumerate(results):
             if isinstance(result, Exception):
-                # Return original cluster with error status
+                # Wrap in EnrichmentError for structured context
                 cluster = clusters[i].copy()
+                error = EnrichmentError(
+                    "Enrichment failed for cluster",
+                    context={
+                        "ticker": cluster.get("ticker"),
+                        "error": str(result),
+                        "error_type": type(result).__name__,
+                    },
+                )
                 cluster["enrichment_status"] = "error"
-                cluster["enrichment_errors"] = [str(result)]
+                cluster["enrichment_errors"] = [str(error)]
                 enriched.append(cluster)
             else:
                 enriched.append(result)
