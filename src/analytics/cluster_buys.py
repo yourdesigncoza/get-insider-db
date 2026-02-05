@@ -222,37 +222,37 @@ def find_cluster_buys(
         computed AS (
             SELECT
                 b.ticker,
-                (b.transaction_date - INTERVAL '{window_interval} day')::date AS window_start,
+                (b.transaction_date - INTERVAL '1 day' * :window_interval)::date AS window_start,
                 b.transaction_date::date AS window_end,
                 (
                     SELECT MAX(b2.filing_date)
                     FROM base b2
                     WHERE b2.ticker = b.ticker
-                      AND b2.transaction_date BETWEEN b.transaction_date - INTERVAL '{window_interval} day' AND b.transaction_date
+                      AND b2.transaction_date BETWEEN b.transaction_date - INTERVAL '1 day' * :window_interval AND b.transaction_date
                 ) AS signal_filing_date,
                 (
                     SELECT COUNT(*)
                     FROM base b2
                     WHERE b2.ticker = b.ticker
-                      AND b2.transaction_date BETWEEN b.transaction_date - INTERVAL '{window_interval} day' AND b.transaction_date
+                      AND b2.transaction_date BETWEEN b.transaction_date - INTERVAL '1 day' * :window_interval AND b.transaction_date
                 ) AS num_trades,
                 (
                     SELECT COUNT(DISTINCT b2.insider_name)
                     FROM base b2
                     WHERE b2.ticker = b.ticker
-                      AND b2.transaction_date BETWEEN b.transaction_date - INTERVAL '{window_interval} day' AND b.transaction_date
+                      AND b2.transaction_date BETWEEN b.transaction_date - INTERVAL '1 day' * :window_interval AND b.transaction_date
                 ) AS num_insiders,
                 (
                     SELECT SUM(b2.shares)
                     FROM base b2
                     WHERE b2.ticker = b.ticker
-                      AND b2.transaction_date BETWEEN b.transaction_date - INTERVAL '{window_interval} day' AND b.transaction_date
+                      AND b2.transaction_date BETWEEN b.transaction_date - INTERVAL '1 day' * :window_interval AND b.transaction_date
                 ) AS total_shares,
                 (
                     SELECT SUM(b2.total_value)
                     FROM base b2
                     WHERE b2.ticker = b.ticker
-                      AND b2.transaction_date BETWEEN b.transaction_date - INTERVAL '{window_interval} day' AND b.transaction_date
+                      AND b2.transaction_date BETWEEN b.transaction_date - INTERVAL '1 day' * :window_interval AND b.transaction_date
                 ) AS total_value,
                 b.shares_owned_after,
                 (
@@ -280,7 +280,7 @@ def find_cluster_buys(
                             MIN(insider_title) AS insider_title
                         FROM base b3
                         WHERE b3.ticker = b.ticker
-                          AND b3.transaction_date BETWEEN b.transaction_date - INTERVAL '{window_interval} day' AND b.transaction_date
+                          AND b3.transaction_date BETWEEN b.transaction_date - INTERVAL '1 day' * :window_interval AND b.transaction_date
                         GROUP BY insider_name
                         ORDER BY sum_total_value DESC
                     ) top3
@@ -315,6 +315,7 @@ def find_cluster_buys(
         "min_insiders": min_insiders,
         "min_total_value": min_total_value,
         "min_trade_value": min_trade_value,
+        "window_interval": window_interval,
     }
     if ticker:
         params["ticker"] = ticker
