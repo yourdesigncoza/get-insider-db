@@ -4,9 +4,9 @@
 
 **Milestone:** M1 — Codebase Remediation
 **Phase:** 01 of 04 (Security Hardening & Data Integrity)
-**Plan:** 01-01 complete (SQL Injection Remediation)
+**Plan:** 01-03 complete (Pre-commit Hooks)
 **Status:** In progress
-**Last activity:** 2026-02-05 - Completed 01-01-PLAN.md
+**Last activity:** 2026-02-05 - Completed 01-03-PLAN.md
 
 **Progress:** ░█░░░░░░░░░░░░░ (1/15 plans = 7%)
 
@@ -35,6 +35,9 @@
 | Planning | LLM: Claude Haiku via Anthropic SDK + Instructor | Cost-effective classification |
 | 01-01 | Use PostgreSQL INTERVAL arithmetic for parameterization | Native support for safe interval binding |
 | 01-01 | No f-string interpolation in SQL queries | Prevent SQL injection attacks |
+| 01-03 | detect-secrets over git-secrets | Better plugin ecosystem, baseline tracking |
+| 01-03 | Commit .secrets.baseline | Share known false positives across team |
+| 01-03 | Local .env hook with explicit regex | Catches .env variants even if .gitignore misconfigured |
 
 ## Blockers
 
@@ -42,8 +45,8 @@ None
 
 ## Session Continuity
 
-**Last session:** 2026-02-05 10:24:37 UTC
-**Stopped at:** Completed 01-01-PLAN.md
+**Last session:** 2026-02-05 10:27:48 UTC
+**Stopped at:** Completed 01-03-PLAN.md
 **Resume file:** None
 
 ## Notes
