@@ -149,6 +149,7 @@ None
 **Plans:**
 - **Plan 04-01:** Complete - AI-powered insider classification with Claude Haiku
 - **Plan 04-02:** Complete - Enrichment checkpointing for crash recovery
+- **Plan 04-04:** Complete - Signal audit trail with SignalHistoryRecorder
 
 **Completed in 04-01:**
 - src/llm/ module with Instructor-wrapped Anthropic client
@@ -163,6 +164,13 @@ None
 - Integrated checkpointing into enrich_clusters_with_price.py
 - --no-resume flag for fresh starts
 - Tests: 12 passing for CRUD and SQL safety
+
+**Completed in 04-04:**
+- signal_history table with FK to cluster_events
+- src/audit/ module with SignalHistoryRecorder class
+- record_event, get_history, get_recent_events methods
+- Append-only design (no update/delete operations)
+- Tests: 21 passing for validation, CRUD, immutability
 
 ## Session Continuity
 
