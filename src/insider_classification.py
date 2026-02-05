@@ -1,5 +1,5 @@
 """
-Insider entity classification helpers with a rule-based pass and AI stub.
+Insider entity classification helpers with a rule-based pass and AI fallback.
 """
 
 from __future__ import annotations
@@ -22,6 +22,8 @@ from src.classification_config import (
     ENTITY_OTHER,
     ENTITY_UNKNOWN,
 )
+from src.llm.client import get_llm_client
+from src.llm.schemas import InsiderClassification as LLMClassification
 
 
 def normalize_insider_name(name: str) -> str:
@@ -77,23 +79,67 @@ def classify_insider_with_ai(
     flags: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """
-    Stub for an AI-powered classifier.
+    AI-powered classifier using Claude.
 
-    TODO: replace the placeholder logic with an OpenAI (or similar) call that
-    returns a JSON payload containing entity_type, is_fund_like, and rationale.
+    Uses Claude Haiku for cost-effective classification with structured output
+    via Instructor. Falls back to rule-based classification on API failure.
+
+    Args:
+        name: Insider entity name from SEC filing.
+        officer_title: Officer title if available.
+        flags: Optional dict with is_officer, is_director flags.
+
+    Returns:
+        Dict with entity_type, is_fund_like, source, confidence, rationale.
     """
     flags = flags or {}
-    rules_result = classify_insider_by_rules(name, officer_title, flags)
-    # Example prompt to use when wiring an actual model:
-    # "Classify SEC Form 4 insider names into: person, fund_or_investment_vehicle,
-    #  operating_company, trust_or_foundation, other. Return JSON with entity_type,
-    #  is_fund_like (bool), and a short rationale."
-    ai_result = dict(rules_result)
-    ai_result["source"] = "ai"
-    ai_result["confidence"] = max(rules_result.get("confidence", 0.0), 0.75)
-    if not ai_result.get("rationale"):
-        ai_result["rationale"] = "Stubbed AI classification reused rule-based result"
-    return ai_result
+
+    # Build context for LLM
+    context_parts = [f"Name: {name}"]
+    if officer_title:
+        context_parts.append(f"Title: {officer_title}")
+    if flags.get("is_officer"):
+        context_parts.append("Flagged as officer")
+    if flags.get("is_director"):
+        context_parts.append("Flagged as director")
+
+    try:
+        client = get_llm_client()
+        result: LLMClassification = client.messages.create(
+            model="claude-3-5-haiku-20241022",
+            max_tokens=256,
+            messages=[
+                {
+                    "role": "user",
+                    "content": f"""Classify this SEC Form 4 insider:
+
+{chr(10).join(context_parts)}
+
+Categories:
+- person: Individual human (most officers/directors)
+- fund_or_investment_vehicle: Investment funds (LP, Partners, Capital, Fund)
+- operating_company: Business entities (Inc, Corp) NOT investment vehicles
+- trust_or_foundation: Trusts, foundations
+- other: None of the above
+
+Return classification with confidence (0-1) and brief rationale.""",
+                }
+            ],
+            response_model=LLMClassification,
+        )
+
+        return {
+            "entity_type": result.entity_type.value,
+            "is_fund_like": result.is_fund_like,
+            "source": "ai",
+            "confidence": result.confidence,
+            "rationale": result.rationale,
+        }
+    except Exception as e:
+        # Fallback to rules on any AI failure
+        rules_result = classify_insider_by_rules(name, officer_title, flags)
+        rules_result["rationale"] = f"AI fallback: {e}"
+        return rules_result
 
 
 def get_or_create_insider_entity(
