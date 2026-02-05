@@ -31,10 +31,15 @@ from src.services.streaming import (
     batch_clusters,
 )
 from src.logging_config import configure_logging, get_logger
+from src.checkpointing.checkpoint_manager import CheckpointManager
+from src.config import get_engine
 
 # Configure logging
 configure_logging()
 logger = get_logger(__name__)
+
+# Checkpoint frequency: save every N clusters processed in memory mode
+CHECKPOINT_FREQUENCY = 25
 
 
 @dataclass
@@ -209,18 +214,22 @@ async def enrich_small_file(
     api_key: str,
     max_concurrent: int = 10,
     shutdown: GracefulShutdown | None = None,
+    resume: bool = True,
+    checkpoint_mgr: CheckpointManager | None = None,
 ) -> tuple[Path, EnrichmentStats, float]:
     """
     Enrich small files by loading entire JSON into memory.
 
     More efficient for files with <100 clusters since it avoids
-    streaming overhead.
+    streaming overhead. Supports crash recovery via checkpointing.
 
     Args:
         file_path: Input JSON file
         api_key: Financial Datasets API key
         max_concurrent: Max concurrent API requests
         shutdown: Optional shutdown handler
+        resume: Whether to resume from checkpoint if exists
+        checkpoint_mgr: Optional checkpoint manager for crash recovery
 
     Returns:
         Tuple of (output_path, stats, elapsed_seconds)
@@ -235,25 +244,79 @@ async def enrich_small_file(
 
     clusters = data.get("rows", [])
     total = len(clusters)
-    logger.info("starting_enrichment", file=str(file_path), total_clusters=total, mode="memory")
+
+    # Checkpoint setup
+    run_id = f"async_enrich_{file_path.stem}"
+    start_index = 0
+    processed_tickers: list[str] = []
+    errors: dict[str, str] = {}
+
+    # Check for existing checkpoint to resume from
+    if resume and checkpoint_mgr:
+        checkpoint = checkpoint_mgr.get_checkpoint(run_id)
+        if checkpoint:
+            start_index = checkpoint["last_index"] + 1
+            processed_tickers = list(checkpoint["processed_tickers"])
+            errors = dict(checkpoint["errors"])
+            logger.info(
+                "resuming_from_checkpoint",
+                run_id=run_id,
+                start_index=start_index,
+                total=total,
+            )
+
+    logger.info(
+        "starting_enrichment",
+        file=str(file_path),
+        total_clusters=total,
+        mode="memory",
+        start_index=start_index,
+    )
 
     async with AsyncEnricher(api_key=api_key, max_concurrent=max_concurrent) as enricher:
         if shutdown:
             shutdown.register(enricher)
 
-        enriched_rows = []
+        # Keep already processed clusters as-is from original data
+        enriched_rows = clusters[:start_index]
+        # Account for already processed in stats
+        stats.total_clusters = start_index
 
-        for i, cluster in enumerate(clusters, 1):
+        for i, cluster in enumerate(clusters[start_index:], start_index):
             if shutdown and shutdown.shutdown_requested:
-                logger.warning("shutdown_requested", processed=i - 1)
-                # Include already processed clusters
+                logger.warning("shutdown_requested", processed=i)
                 break
 
-            enriched = await enricher.enrich_cluster(cluster)
-            enriched_rows.append(enriched)
-            stats.record(enriched)
-            ticker = cluster.get("ticker", "?")
-            print(f"  [{i}/{total}] Enriched {ticker}")
+            ticker = cluster.get("ticker", f"row_{i}")
+
+            try:
+                enriched = await enricher.enrich_cluster(cluster)
+                enriched_rows.append(enriched)
+                stats.record(enriched)
+                processed_tickers.append(ticker)
+            except Exception as e:
+                logger.error(
+                    "enrichment_error",
+                    ticker=ticker,
+                    error=str(e),
+                    error_type=type(e).__name__,
+                )
+                errors[ticker] = str(e)
+                enriched_rows.append(cluster)  # Keep original on error
+                stats.errors += 1
+                stats.total_clusters += 1
+
+            print(f"  [{i + 1}/{total}] Enriched {ticker}")
+
+            # Save checkpoint periodically
+            if checkpoint_mgr and (i + 1) % CHECKPOINT_FREQUENCY == 0:
+                checkpoint_mgr.save_checkpoint(
+                    run_id=run_id,
+                    last_index=i,
+                    processed_tickers=processed_tickers,
+                    errors=errors,
+                )
+                logger.info("checkpoint_saved", index=i + 1, total=total)
 
     data["rows"] = enriched_rows
     if "metadata" in data:
@@ -262,6 +325,11 @@ async def enrich_small_file(
 
     with open(output_path, "w") as f:
         json.dump(data, f, indent=2, default=str)
+
+    # Clear checkpoint on successful completion
+    if checkpoint_mgr:
+        checkpoint_mgr.clear_checkpoint(run_id)
+        logger.info("checkpoint_cleared", run_id=run_id)
 
     elapsed = time.time() - start_time
     return output_path, stats, elapsed
@@ -273,6 +341,7 @@ async def process_file(
     max_concurrent: int = 10,
     batch_size: int = 50,
     use_streaming: bool = True,
+    resume: bool = True,
 ) -> None:
     """
     Process cluster export file with async enrichment.
@@ -283,6 +352,7 @@ async def process_file(
         max_concurrent: Max concurrent API requests
         batch_size: Clusters per batch
         use_streaming: Use ijson streaming for large files
+        resume: Whether to resume from checkpoint (memory mode only)
     """
     if not file_path.exists():
         logger.error("file_not_found", file=str(file_path))
@@ -290,8 +360,13 @@ async def process_file(
 
     shutdown = GracefulShutdown()
 
+    # Initialize checkpoint manager for memory mode
+    engine = get_engine()
+    checkpoint_mgr = CheckpointManager(engine)
+
     # Decide streaming vs memory based on file size
     # Streaming is better for large files (>100 clusters typically)
+    # Note: Checkpointing only supported in memory mode (streaming has no resume capability)
     if use_streaming:
         # Quick check: count clusters to decide
         cluster_count = sum(1 for _ in stream_clusters(file_path))
@@ -299,16 +374,27 @@ async def process_file(
         if cluster_count < 50:
             logger.info("using_memory_mode", reason="small_file", clusters=cluster_count)
             output_path, stats, elapsed = await enrich_small_file(
-                file_path, api_key, max_concurrent, shutdown
+                file_path,
+                api_key,
+                max_concurrent,
+                shutdown,
+                resume=resume,
+                checkpoint_mgr=checkpoint_mgr,
             )
         else:
-            logger.info("using_streaming_mode", clusters=cluster_count)
+            # Streaming mode: no checkpointing support
+            logger.info("using_streaming_mode", clusters=cluster_count, checkpointing="disabled")
             output_path, stats, elapsed = await enrich_streaming(
                 file_path, api_key, max_concurrent, batch_size, shutdown
             )
     else:
         output_path, stats, elapsed = await enrich_small_file(
-            file_path, api_key, max_concurrent, shutdown
+            file_path,
+            api_key,
+            max_concurrent,
+            shutdown,
+            resume=resume,
+            checkpoint_mgr=checkpoint_mgr,
         )
 
     # Report results
@@ -362,6 +448,11 @@ Examples:
         action="store_true",
         help="Load entire file into memory instead of streaming",
     )
+    parser.add_argument(
+        "--no-resume",
+        action="store_true",
+        help="Start fresh run, ignoring any existing checkpoint",
+    )
     args = parser.parse_args()
 
     # Get API key from environment
@@ -380,6 +471,7 @@ Examples:
             max_concurrent=args.max_concurrent,
             batch_size=args.batch_size,
             use_streaming=not args.no_streaming,
+            resume=not args.no_resume,
         )
     )
 
