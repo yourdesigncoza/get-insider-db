@@ -88,6 +88,9 @@
 | 05-02 | CHECKPOINT_FREQUENCY = 25 for async | Match sync script default for consistency |
 | 05-02 | Streaming mode excluded from checkpointing | Cannot resume mid-stream without full re-parse |
 | 05-02 | Run ID format: async_enrich_{file_stem} | Unique per input file, distinguishes from sync |
+| 06-01 | async_enrichment actor distinct from sync enrichment | Traceability in audit trail |
+| 06-01 | Recording failures do not crash enrichment | Resilience over strict audit trail |
+| 06-01 | Only record events for clusters with cluster_id | DB join in export provides cluster_id |
 | 06-02 | Custom _before_sleep_structlog for tenacity | stdlib before_sleep_log incompatible with structlog |
 | 06-02 | Debug-level logging for HTTP/DB ops | High-frequency operations, avoid noise |
 
@@ -234,6 +237,12 @@ None
 - **Plan 06-01:** Complete - Signal history audit integration
 - **Plan 06-02:** Complete - Structlog standardization in async_client
 - **Plan 06-03:** Pending - (remaining plan)
+
+**Completed in 06-01:**
+- src/audit/signal_history.py: Added async_enrichment actor to ACTORS frozenset
+- scripts/enrich_clusters_async.py: Wired SignalHistoryRecorder into both enrich_streaming() and enrich_small_file()
+- Recording failures log warning but do not crash enrichment
+- Tests: 6 passing for SignalHistoryRecorder integration
 
 **Completed in 06-02:**
 - src/async_client/retry.py: Replaced stdlib logging with structlog
