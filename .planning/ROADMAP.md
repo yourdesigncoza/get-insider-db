@@ -72,16 +72,18 @@ Plans:
 
 ---
 
-### Phase 05: Async Enricher Parity
+### Phase 05: Async Enricher Parity ✓
 **Goal:** Bring async enricher to feature parity with sync (fallback + resume)
-**Status:** Planned (2 plans in 1 wave)
+**Status:** Complete (verified 2026-02-05)
 **Gap Closure:** Closes integration gaps from M1 audit
 
 **Plans:** 2 plans
 
 Plans:
-- [ ] 05-01-PLAN.md - YFinance fallback in AsyncEnricher (asyncio.to_thread wrapper)
-- [ ] 05-02-PLAN.md - Checkpointing in async CLI (memory mode crash recovery)
+- [x] 05-01-PLAN.md - YFinance fallback in AsyncEnricher (asyncio.to_thread wrapper)
+- [x] 05-02-PLAN.md - Checkpointing in async CLI (memory mode crash recovery)
+
+**Verification:** ✓ 7/7 must-haves verified, async fallback + resume working
 
 **Depends on:** Phase 03 async infrastructure, Phase 04 checkpointing
 **Closes:**
