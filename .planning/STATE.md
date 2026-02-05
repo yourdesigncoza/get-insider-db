@@ -2,24 +2,24 @@
 
 ## Current Position
 
-**Milestone:** M1 — Codebase Remediation
+**Milestone:** M1 - Codebase Remediation
 **Phase:** 06 of 6 (Production Integration Cleanup)
-**Plan:** 2 of 3 complete
-**Status:** In progress
-**Last activity:** 2026-02-05 - Completed 06-02-PLAN.md (structlog standardization)
+**Plan:** 3 of 3 complete
+**Status:** Phase 06 complete
+**Last activity:** 2026-02-05 - Completed 06-03-PLAN.md (exception type wiring)
 
-**Progress:** ██████████████░ (19/20 plans = 95%)
+**Progress:** ████████████████ (20/20 plans = 100%)
 
 ## Phase Status
 
 | Phase | Name | Plans | Waves | Status |
 |-------|------|-------|-------|--------|
-| 01 | Security Hardening & Data Integrity | 3 | 1 | ✓ Complete (verified) |
-| 02 | Architectural Stabilization & Observability | 4 | 2 | ✓ Complete (verified) |
-| 03 | Performance & Scaling | 4 | 3 | ✓ Complete (verified) |
-| 04 | Feature Completeness & Debt Cleanup | 4 | 1 | ✓ Complete (verified) |
-| 05 | Async Enricher Parity | 2 | 1 | ✓ Complete (verified) |
-| 06 | Production Integration Cleanup | 3 | 1 | In progress (2/3) |
+| 01 | Security Hardening & Data Integrity | 3 | 1 | Complete (verified) |
+| 02 | Architectural Stabilization & Observability | 4 | 2 | Complete (verified) |
+| 03 | Performance & Scaling | 4 | 3 | Complete (verified) |
+| 04 | Feature Completeness & Debt Cleanup | 4 | 1 | Complete (verified) |
+| 05 | Async Enricher Parity | 2 | 1 | Complete (verified) |
+| 06 | Production Integration Cleanup | 3 | 1 | Complete |
 
 **Total:** 20 plans across 6 phases
 
@@ -93,6 +93,9 @@
 | 06-01 | Only record events for clusters with cluster_id | DB join in export provides cluster_id |
 | 06-02 | Custom _before_sleep_structlog for tenacity | stdlib before_sleep_log incompatible with structlog |
 | 06-02 | Debug-level logging for HTTP/DB ops | High-frequency operations, avoid noise |
+| 06-03 | RateLimitError raised before raise_for_status() on 429 | Specific exception type for rate limit handling |
+| 06-03 | RateLimitError added to retry conditions | Redundant coverage in _is_retryable and retry_if_exception_type |
+| 06-03 | EnrichmentError wraps batch failures with context | Structured error metadata (ticker, error, error_type) |
 
 ## Blockers
 
@@ -168,7 +171,7 @@ None
 - **Tests:** 132 passing (all modules)
 - **AI classification:** Claude Haiku with Instructor, rule-based fallback
 - **Checkpointing:** Database-backed crash recovery with --no-resume flag
-- **Legacy cleanup:** cluster_service.py reduced 63% (424 → 156 lines)
+- **Legacy cleanup:** cluster_service.py reduced 63% (424 to 156 lines)
 - **Audit trail:** Append-only signal_history table with SignalHistoryRecorder
 
 **Plans:**
@@ -231,12 +234,16 @@ None
 - Streaming mode explicitly excluded from checkpointing
 - Tests: 7 passing for checkpoint behavior
 
-## Phase 06 Progress
+## Phase 06 Verification Summary
+
+- **Score:** All must-haves verified
+- **Tests:** 130 passing across all modules
+- **Exception types:** RateLimitError and EnrichmentError wired throughout
 
 **Plans:**
 - **Plan 06-01:** Complete - Signal history audit integration
 - **Plan 06-02:** Complete - Structlog standardization in async_client
-- **Plan 06-03:** Pending - (remaining plan)
+- **Plan 06-03:** Complete - Exception type wiring
 
 **Completed in 06-01:**
 - src/audit/signal_history.py: Added async_enrichment actor to ACTORS frozenset
@@ -249,12 +256,17 @@ None
 - src/async_client/http_client.py: Added debug logging for session/request lifecycle
 - src/async_client/db_engine.py: Added debug logging for engine lifecycle
 - Custom _before_sleep_structlog callback for tenacity retry logging
-- Tests: 123 passing (1 pre-existing integration test failure unrelated to changes)
+
+**Completed in 06-03:**
+- src/async_client/http_client.py: RateLimitError on 429 before raise_for_status()
+- src/async_client/retry.py: RateLimitError in retry conditions
+- src/services/enrichment_service.py: EnrichmentError/RateLimitError handling
+- Tests: 130 passing (all modules)
 
 ## Session Continuity
 
-**Last session:** 2026-02-05 16:35:00 UTC
-**Stopped at:** Completed 06-02-PLAN.md (structlog standardization)
+**Last session:** 2026-02-05 16:47:00 UTC
+**Stopped at:** Completed 06-03-PLAN.md (exception type wiring)
 **Resume file:** None
 
 ## Notes
@@ -272,3 +284,5 @@ Phase 04 completed: 2026-02-05
 Milestone 1 complete: 2026-02-05
 Phase 05 started: 2026-02-05
 Phase 05 completed: 2026-02-05
+Phase 06 started: 2026-02-05
+Phase 06 completed: 2026-02-05
