@@ -4,10 +4,10 @@
 
 **Milestone:** M1 — Codebase Remediation
 **Phase:** 03 in progress
-**Status:** Plan 03-01 and 03-02 complete
-**Last activity:** 2026-02-05 - Completed 03-01-PLAN.md
+**Status:** Plan 03-01, 03-02, 03-03 complete
+**Last activity:** 2026-02-05 - Completed 03-03-PLAN.md
 
-**Progress:** █████████░░░░░░ (9/15 plans = 60%)
+**Progress:** ██████████░░░░░ (10/15 plans = 67%)
 
 ## Phase Status
 
@@ -15,7 +15,7 @@
 |-------|------|-------|-------|--------|
 | 01 | Security Hardening & Data Integrity | 3 | 1 | ✓ Complete (verified) |
 | 02 | Architectural Stabilization & Observability | 4 | 2 | ✓ Complete (verified) |
-| 03 | Performance & Scaling | 4 | 3 | ◐ In Progress (2/4 complete) |
+| 03 | Performance & Scaling | 4 | 3 | ◐ In Progress (3/4 complete) |
 | 04 | Feature Completeness & Debt Cleanup | 4 | 1 | ○ Planned |
 
 **Total:** 15 plans across 4 phases
@@ -62,6 +62,10 @@
 | 03-02 | Use ijson.items('rows.item') for streaming | Native streaming without custom parsing |
 | 03-02 | Default batch_size=50 | Balance memory consumption vs processing overhead |
 | 03-02 | Support file paths and file-like objects | Flexibility for testing and production use |
+| 03-03 | Price and fundamentals fetched concurrently via asyncio.gather | Maximum parallelism for enrichment |
+| 03-03 | Cache-first pattern: check DB before API call | Reduce API calls and costs |
+| 03-03 | Error isolation: batch failures don't crash other clusters | Resilient batch processing |
+| 03-03 | Backward-compatible output fields | Existing consumers continue to work |
 
 ## Blockers
 
@@ -95,7 +99,7 @@ None
 **Plans:**
 - **Plan 03-01:** Complete - Async client infrastructure
 - **Plan 03-02:** Complete - Streaming JSON module with ijson
-- **Plan 03-03:** Pending - Async price enricher
+- **Plan 03-03:** Complete - Async price enricher
 - **Plan 03-04:** Pending - Async batch classification
 
 **Completed in 03-01:**
@@ -110,10 +114,17 @@ None
 - batch_clusters() and process_batches() utilities
 - Tests: 28/28 passing (0.64s)
 
+**Completed in 03-03:**
+- src/services/enrichment_service.py with AsyncEnricher class
+- Concurrent price+fundamental fetching via asyncio.gather
+- Cache-first pattern (DB before API)
+- Per-cluster error isolation in batch processing
+- Tests: 59/59 passing (0.85s)
+
 ## Session Continuity
 
-**Last session:** 2026-02-05 12:14:00 UTC
-**Stopped at:** Completed 03-01-PLAN.md
+**Last session:** 2026-02-05 12:37:00 UTC
+**Stopped at:** Completed 03-03-PLAN.md
 **Resume file:** None
 
 ## Notes
