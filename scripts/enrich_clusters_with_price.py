@@ -78,7 +78,7 @@ class InvalidTickerError(Exception):
 )
 def _make_request(url, params):
     global LAST_REQUEST_TIME
-    
+
     if RATE_LIMIT_SECONDS > 0:
         with REQUEST_LOCK:
             now = time.time()
@@ -87,16 +87,16 @@ def _make_request(url, params):
                 sleep_time = RATE_LIMIT_SECONDS - elapsed
                 time.sleep(sleep_time)
             LAST_REQUEST_TIME = time.time()
-            
+
     headers = {
         'X-API-KEY': FINANCIAL_DATASETS_API_KEY
     }
 
     response = requests.get(url, headers=headers, params=params, timeout=10)
     if response.status_code == 429:
-        print("Rate limit hit, retrying...", file=sys.stderr)
+        logger.warning("Rate limit hit, retrying...")
         response.raise_for_status() # Trigger retry
-    
+
     try:
         response.raise_for_status()
     except requests.exceptions.HTTPError as e:
@@ -112,10 +112,10 @@ def _make_request(url, params):
                 )
             ):
                 raise InvalidTickerError(f"Invalid ticker for provider: {params.get('ticker')}") from e
-        print(f"HTTP Error {response.status_code} for URL: {url}", file=sys.stderr)
-        print(f"Response: {response.text}", file=sys.stderr)
+        logger.error(f"HTTP Error {response.status_code} for URL: {url}")
+        logger.error(f"Response: {response.text}")
         raise e
-        
+
     return response
 
 # -------------------------------------------------------------------------
@@ -127,9 +127,9 @@ def _fetch_prices_from_db(ticker: str, start_date: datetime, end_date: datetime)
     engine = get_engine()
     with engine.connect() as conn:
         rows = conn.execute(text("""
-            SELECT price_date, close_price 
-            FROM market_prices 
-            WHERE ticker = :ticker 
+            SELECT price_date, close_price
+            FROM market_prices
+            WHERE ticker = :ticker
               AND price_date BETWEEN :start AND :end
             ORDER BY price_date
         """), {
@@ -137,19 +137,19 @@ def _fetch_prices_from_db(ticker: str, start_date: datetime, end_date: datetime)
             "start": start_date.date(),
             "end": end_date.date()
         }).fetchall()
-        
-    if rows: 
-        print(f"DEBUG: Found {len(rows)} cached prices for {ticker} from DB.", file=sys.stderr)
+
+    if rows:
+        logger.debug(f"Found {len(rows)} cached prices for {ticker} from DB")
     else:
-        print(f"DEBUG: No cached prices for {ticker} in DB.", file=sys.stderr)
-        
+        logger.debug(f"No cached prices for {ticker} in DB")
+
     return [{"date": datetime.combine(row[0], datetime.min.time()), "close": float(row[1])} for row in rows]
 
 def _save_prices_to_db(ticker: str, prices: List[Dict[str, Any]]):
     """Batch insert prices into DB."""
     if not prices:
         return
-        
+
     engine = get_engine()
     with engine.begin() as conn:
         for p in prices:
@@ -179,9 +179,9 @@ def _get_price_history(ticker: str, start_date: datetime, end_date: datetime) ->
         # Look back 7 days to ensure we capture the start date price if it falls on a weekend
         fetch_start = start_date - timedelta(days=7)
         db_prices = _fetch_prices_from_db(ticker, fetch_start, end_date)
-        
+
         days_needed = (end_date - start_date).days
-        
+
         # Heuristic for missing data
         needs_fetch = False
         if days_needed > 5:
@@ -204,7 +204,7 @@ def _get_price_history(ticker: str, start_date: datetime, end_date: datetime) ->
             return db_prices
 
         # 2. Fetch from Financial Datasets AI
-        
+
         url = "https://api.financialdatasets.ai/prices/"
         params = {
             'ticker': ticker,
@@ -216,7 +216,7 @@ def _get_price_history(ticker: str, start_date: datetime, end_date: datetime) ->
 
         response = _make_request(url, params=params)
         data = response.json()
-        
+
         time_series_data = data.get("prices", [])
 
         if not time_series_data:
@@ -246,8 +246,47 @@ def _get_price_history(ticker: str, start_date: datetime, end_date: datetime) ->
     except InvalidTickerError:
         raise
     except Exception as e:
-        print(f"Warning: Error fetching history for {ticker}: {e}", file=sys.stderr)
+        logger.warning(f"Error fetching history for {ticker}: {e}")
         return []
+
+def _fetch_price_yfinance(ticker: str, target_date: date) -> Optional[float]:
+    """Fetch price from YFinance as fallback."""
+    try:
+        stock = yf.Ticker(ticker)
+        # Request 7-day range to handle weekends/holidays
+        start = target_date - timedelta(days=7)
+        end = target_date + timedelta(days=1)
+
+        hist = stock.history(
+            start=start.isoformat(),
+            end=end.isoformat(),
+            auto_adjust=True,
+            repair=True,
+        )
+
+        if hist.empty:
+            logger.warning(f"YFinance: No data for {ticker} in range {start} to {end}")
+            return None
+
+        # Convert index to dates for comparison
+        hist.index = hist.index.date
+
+        # Find closest date <= target_date
+        valid_dates = [d for d in hist.index if d <= target_date]
+        if not valid_dates:
+            logger.warning(f"YFinance: No data for {ticker} on or before {target_date}")
+            return None
+
+        closest_date = max(valid_dates)
+        price = float(hist.loc[closest_date, 'Close'])
+
+        if closest_date != target_date:
+            logger.debug(f"YFinance: Used {closest_date} for {ticker} (requested {target_date})")
+
+        return price
+    except Exception as e:
+        logger.error(f"YFinance fallback failed for {ticker}: {e}")
+        return None
 
 # -------------------------------------------------------------------------
 # FUNDAMENTALS CACHE LOGIC
@@ -260,12 +299,12 @@ def _fetch_fundamentals_from_db(ticker: str, target_date: datetime) -> Optional[
     # Search a wider window around the target date.
     start_search = target_date - timedelta(days=FUNDAMENTALS_MAX_LOOKBACK_DAYS)
     end_search = target_date + timedelta(days=FUNDAMENTALS_MAX_FORWARD_DAYS)
-    
+
     with engine.connect() as conn:
         rows = conn.execute(text("""
             SELECT date, market_cap, enterprise_value, pe_ratio, pb_ratio, trailing_peg_ratio
-            FROM market_fundamentals 
-            WHERE ticker = :ticker 
+            FROM market_fundamentals
+            WHERE ticker = :ticker
               AND date BETWEEN :start AND :end
             ORDER BY date DESC
             LIMIT 40
@@ -274,7 +313,7 @@ def _fetch_fundamentals_from_db(ticker: str, target_date: datetime) -> Optional[
             "start": start_search.date(),
             "end": end_search.date(),
         }).fetchall()
-        
+
     if rows:
         candidates: List[Dict[str, Any]] = []
         for row in rows:
@@ -306,16 +345,16 @@ def _fetch_fundamentals_from_db(ticker: str, target_date: datetime) -> Optional[
             )
         )
         best = candidates[0]
-        print(f"DEBUG: Found cached fundamentals for {ticker} from DB.", file=sys.stderr)
+        logger.debug(f"Found cached fundamentals for {ticker} from DB")
         return best
-    print(f"DEBUG: No cached fundamentals for {ticker} in DB.", file=sys.stderr)
+    logger.debug(f"No cached fundamentals for {ticker} in DB")
     return None
 
 def _save_fundamentals_to_db(ticker: str, data: List[Dict[str, Any]]):
     """Batch insert fundamentals."""
     if not data:
         return
-    
+
     engine = get_engine()
     with engine.begin() as conn:
         for d in data:
@@ -462,7 +501,7 @@ def _get_fundamental_at_date(ticker: str, target_date: datetime, price_at_date: 
         cached = _fetch_fundamentals_from_db(ticker, target_date)
         if cached:
             return cached
-            
+
         # 2. Fetch from Financial Datasets AI
         # We only care about the metric record closest to window_end (target_date), so:
         # - fetch a small recent window from the API
@@ -482,7 +521,7 @@ def _get_fundamental_at_date(ticker: str, target_date: datetime, price_at_date: 
             try:
                 records = _fetch_financial_metrics_from_api(ticker, FINANCIAL_METRICS_PERIOD, limit=lim)
             except Exception as e:
-                print(f"Error fetching Financial Datasets AI financial metrics for {ticker}: {e}", file=sys.stderr)
+                logger.warning(f"Error fetching Financial Datasets AI financial metrics for {ticker}: {e}")
                 continue
 
             if not records:
@@ -507,21 +546,20 @@ def _get_fundamental_at_date(ticker: str, target_date: datetime, price_at_date: 
                 break
 
             if lim < FINANCIAL_METRICS_MAX_LIMIT:
-                print(
-                    f"DEBUG: Fundamentals returned {last_records_count} records for {ticker} but none near window_end "
-                    f"(window_end={target_date.date()}); retrying with larger limit...",
-                    file=sys.stderr,
+                logger.debug(
+                    f"Fundamentals returned {last_records_count} records for {ticker} but none near window_end "
+                    f"(window_end={target_date.date()}); retrying with larger limit..."
                 )
 
         if not last_records_count:
-            print(f"DEBUG: No fundamentals records returned for {ticker} from API.", file=sys.stderr)
+            logger.warning(f"No fundamentals records returned for {ticker} from API")
             return None
 
         if not candidates:
-            print(
-                f"DEBUG: Fundamentals returned but no usable record near window_end for {ticker} "
-                f"(window_end={target_date.date()}, lookback_days={FUNDAMENTALS_MAX_LOOKBACK_DAYS}, forward_days={FUNDAMENTALS_MAX_FORWARD_DAYS}).",
-                file=sys.stderr,
+            logger.warning(
+                f"Fundamentals returned but no usable record near window_end for {ticker} "
+                f"(window_end={target_date.date()}, lookback_days={FUNDAMENTALS_MAX_LOOKBACK_DAYS}, "
+                f"forward_days={FUNDAMENTALS_MAX_FORWARD_DAYS})"
             )
             return None
 
@@ -543,9 +581,8 @@ def _get_fundamental_at_date(ticker: str, target_date: datetime, price_at_date: 
         )
         best = candidates[0]
         if best["date"].date() > target_date.date():
-            print(
-                f"DEBUG: Using next-period fundamentals for {ticker}: {best['date'].date()} (window_end={target_date.date()}).",
-                file=sys.stderr,
+            logger.debug(
+                f"Using next-period fundamentals for {ticker}: {best['date'].date()} (window_end={target_date.date()})"
             )
 
         _save_fundamentals_to_db(ticker, [best])
@@ -554,7 +591,7 @@ def _get_fundamental_at_date(ticker: str, target_date: datetime, price_at_date: 
     except InvalidTickerError:
         raise
     except Exception as e:
-        print(f"Error in fundamental logic for {ticker}: {e}", file=sys.stderr)
+        logger.warning(f"Error in fundamental logic for {ticker}: {e}")
         return None
 
 # -------------------------------------------------------------------------
@@ -589,7 +626,7 @@ def enrich_row(row: Dict[str, Any]) -> Dict[str, Any]:
     ticker = row.get("ticker")
     window_end_str = row.get("window_end")
     total_value = row.get("total_value", 0)
-    
+
     if not ticker or not window_end_str:
         return row
 
@@ -619,26 +656,26 @@ def enrich_row(row: Dict[str, Any]) -> Dict[str, Any]:
     # `date_1m/2m/3m` can land on weekends/holidays; fetch a little extra so
     # "_on_or_after" lookup can find the next trading day.
     price_fetch_end = date_3m + timedelta(days=PRICE_LOOKAHEAD_BUFFER_DAYS)
-    
+
     # ---------------------------------------------------------
     # PARALLEL FETCHING
     # ---------------------------------------------------------
     history = []
     fund_data = None
-    
+
     # We fetch prices FIRST because YFinance fallback might need the base price
     # So we can't fully parallelize the dependency chain if we want that robust fallback.
     # But we can still fetch standard Alpha Vantage fundamentals in parallel.
-    
+
     # Revised flow:
     # 1. Fetch Prices (Blocking or Async)
     # 2. Extract Base Price
     # 3. Fetch Fundamentals (passing base price for YF fallback)
-    
+
     # To keep parallel speed for the main API calls:
     # We can fetch Alpha Vantage Fundamentals in parallel with Prices.
     # If Alpha Vantage Funds fails, THEN we do YF (sequentially).
-    
+
     enrichment_status = "ok"
     enrichment_errors: List[str] = []
 
@@ -647,7 +684,7 @@ def enrich_row(row: Dict[str, Any]) -> Dict[str, Any]:
         # We don't pass price_at_date here yet, effectively disabling YF inside this parallel call if Tiingo fails
         # We will handle YF fallback explicitly after if needed.
         future_fundamentals = executor.submit(_get_fundamental_at_date, ticker, entry_date, None)
-        
+
         try:
             history = future_prices.result()
         except InvalidTickerError as e:
@@ -656,8 +693,8 @@ def enrich_row(row: Dict[str, Any]) -> Dict[str, Any]:
         except Exception as e:
             enrichment_status = "error"
             enrichment_errors.append(f"prices: {e}")
-            print(f"Price fetch fatal error for {ticker}: {e}", file=sys.stderr)
-        
+            logger.error(f"Price fetch fatal error for {ticker}: {e}")
+
         try:
             fund_data = future_fundamentals.result()
         except InvalidTickerError as e:
@@ -675,23 +712,23 @@ def enrich_row(row: Dict[str, Any]) -> Dict[str, Any]:
 
     if enrichment_status == "ok" and not history:
         enrichment_status = "no_price_data"
-    
+
     results = {}
-    
+
     for suffix, end_date in [("1m", date_1m), ("2m", date_2m), ("3m", date_3m)]:
         end_record = _get_first_price_record_on_or_after(history, end_date)
         end_price = end_record['close'] if end_record else None
-        
+
         ret_val = None
         if base_price and end_price:
             ret_val = round(((end_price - base_price) / base_price) * 100.0, 2)
-            
+
         results[f"price_{suffix}_after"] = end_price
         results[f"return_{suffix}"] = ret_val
-        
+
         if base_record and end_record:
             period_prices = [
-                r['close'] for r in history 
+                r['close'] for r in history
                 if base_record['date'] <= r['date'] <= end_record['date']
             ]
             mdd = _calculate_max_drawdown(period_prices, base_price)
@@ -705,7 +742,7 @@ def enrich_row(row: Dict[str, Any]) -> Dict[str, Any]:
     pe_ratio = fund_data.get("peRatio") if fund_data else None
     pb_ratio = fund_data.get("pbRatio") if fund_data else None
     trailing_peg_ratio = fund_data.get("trailingPegRatio") if fund_data else None
-    
+
     cluster_vs_mcap_pct = None
     if market_cap and total_value and market_cap > 0:
         cluster_vs_mcap_pct = round((total_value / market_cap) * 100.0, 4)
@@ -742,35 +779,35 @@ def enrich_row(row: Dict[str, Any]) -> Dict[str, Any]:
 
 def process_file(file_path: Path):
     if not file_path.exists():
-        print(f"File not found: {file_path}", file=sys.stderr)
+        logger.error(f"File not found: {file_path}")
         return
 
-    print(f"Processing {file_path}...")
+    logger.info(f"Processing {file_path}...")
     try:
         content = file_path.read_text()
         data = json.loads(content)
     except Exception as e:
-        print(f"Error reading/parsing JSON: {e}", file=sys.stderr)
+        logger.error(f"Error reading/parsing JSON: {e}")
         return
 
     if "rows" not in data:
-        print("Invalid JSON format: 'rows' key missing.", file=sys.stderr)
+        logger.error("Invalid JSON format: 'rows' key missing")
         return
 
     enriched_rows = []
     total = len(data["rows"])
     for i, row in enumerate(data["rows"], 1):
-        print(f"  [{i}/{total}] Enriching {row.get('ticker')}...")
+        logger.info(f"  [{i}/{total}] Enriching {row.get('ticker')}...")
         enriched_rows.append(enrich_row(row))
 
     data["rows"] = enriched_rows
-    
+
     if "metadata" in data:
         data["metadata"]["enriched_at"] = datetime.now().isoformat()
 
     output_path = file_path.with_name(f"{file_path.stem}_enriched{file_path.suffix}")
     output_path.write_text(json.dumps(data, indent=2, default=str))
-    print(f"Done! Enriched data written to: {output_path}")
+    logger.info(f"Done! Enriched data written to: {output_path}")
 
 def main():
     global RATE_LIMIT_SECONDS
@@ -779,12 +816,18 @@ def main():
     parser.add_argument("--rate_limit", type=float, default=1.0, help="Minimum seconds between API calls (e.g. 2.0 for free tier)")
     args = parser.parse_args()
 
+    # Configure logging
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    )
+
     if args.rate_limit > 0:
         RATE_LIMIT_SECONDS = args.rate_limit
-        print(f"Rate limiting enabled: {RATE_LIMIT_SECONDS}s between calls.")
+        logger.info(f"Rate limiting enabled: {RATE_LIMIT_SECONDS}s between calls")
 
     if not FINANCIAL_DATASETS_API_KEY:
-        print("Error: FINANCIAL_DATASETS_API_KEY environment variable is not set. Please add it to your .env file.", file=sys.stderr)
+        logger.error("FINANCIAL_DATASETS_API_KEY environment variable is not set. Please add it to your .env file")
         sys.exit(1)
 
     process_file(Path(args.file_path))
