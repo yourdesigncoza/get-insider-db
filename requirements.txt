@@ -13,3 +13,4 @@ tenacity
 yfinance
 pre-commit
 detect-secrets
+structlog>=25.1.0
