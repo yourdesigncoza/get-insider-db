@@ -1,6 +1,6 @@
 """Database-backed checkpointing for long-running jobs."""
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from sqlalchemy import text
@@ -74,7 +74,7 @@ class CheckpointManager:
                     "idx": last_index,
                     "tickers": json.dumps(processed_tickers),
                     "errors": json.dumps(errors),
-                    "now": datetime.utcnow(),
+                    "now": datetime.now(timezone.utc),
                 },
             )
 
