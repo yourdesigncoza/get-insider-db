@@ -33,6 +33,7 @@ from src.services.streaming import (
 from src.logging_config import configure_logging, get_logger
 from src.checkpointing.checkpoint_manager import CheckpointManager
 from src.config import get_engine
+from src.audit.signal_history import SignalHistoryRecorder
 
 # Configure logging
 configure_logging()
@@ -130,6 +131,7 @@ async def enrich_streaming(
     max_concurrent: int = 10,
     batch_size: int = 50,
     shutdown: GracefulShutdown | None = None,
+    recorder: SignalHistoryRecorder | None = None,
 ) -> tuple[Path, EnrichmentStats, float]:
     """
     Enrich clusters using streaming I/O for large files.
@@ -143,6 +145,7 @@ async def enrich_streaming(
         max_concurrent: Max concurrent API requests
         batch_size: Clusters per batch
         shutdown: Optional shutdown handler
+        recorder: Optional SignalHistoryRecorder for audit trail
 
     Returns:
         Tuple of (output_path, stats, elapsed_seconds)
@@ -195,6 +198,28 @@ async def enrich_streaming(
 
                     processed += 1
                     stats.record(cluster)
+
+                    # Record enrichment event to signal history
+                    if recorder and cluster.get("cluster_id"):
+                        try:
+                            recorder.record_event(
+                                cluster_id=cluster["cluster_id"],
+                                event_type="enriched",
+                                changed_by="async_enrichment",
+                                new_values={
+                                    "enrichment_status": cluster.get("enrichment_status"),
+                                    "price_at_entry": cluster.get("price_at_entry"),
+                                    "adjusted_cluster_score": cluster.get("adjusted_cluster_score"),
+                                },
+                                reason=f"Async enriched: {cluster.get('enrichment_status', 'unknown')}",
+                            )
+                        except Exception as e:
+                            logger.warning(
+                                "signal_history_record_failed",
+                                cluster_id=cluster["cluster_id"],
+                                error=str(e),
+                            )
+
                     ticker = cluster.get("ticker", "?")
                     print(f"  [{processed}/{total_clusters}] Enriched {ticker}")
 
@@ -216,6 +241,7 @@ async def enrich_small_file(
     shutdown: GracefulShutdown | None = None,
     resume: bool = True,
     checkpoint_mgr: CheckpointManager | None = None,
+    recorder: SignalHistoryRecorder | None = None,
 ) -> tuple[Path, EnrichmentStats, float]:
     """
     Enrich small files by loading entire JSON into memory.
@@ -230,6 +256,7 @@ async def enrich_small_file(
         shutdown: Optional shutdown handler
         resume: Whether to resume from checkpoint if exists
         checkpoint_mgr: Optional checkpoint manager for crash recovery
+        recorder: Optional SignalHistoryRecorder for audit trail
 
     Returns:
         Tuple of (output_path, stats, elapsed_seconds)
@@ -294,6 +321,27 @@ async def enrich_small_file(
                 enriched_rows.append(enriched)
                 stats.record(enriched)
                 processed_tickers.append(ticker)
+
+                # Record enrichment event to signal history
+                if recorder and enriched.get("cluster_id"):
+                    try:
+                        recorder.record_event(
+                            cluster_id=enriched["cluster_id"],
+                            event_type="enriched",
+                            changed_by="async_enrichment",
+                            new_values={
+                                "enrichment_status": enriched.get("enrichment_status"),
+                                "price_at_entry": enriched.get("price_at_entry"),
+                                "adjusted_cluster_score": enriched.get("adjusted_cluster_score"),
+                            },
+                            reason=f"Async enriched: {enriched.get('enrichment_status', 'unknown')}",
+                        )
+                    except Exception as rec_err:
+                        logger.warning(
+                            "signal_history_record_failed",
+                            cluster_id=enriched["cluster_id"],
+                            error=str(rec_err),
+                        )
             except Exception as e:
                 logger.error(
                     "enrichment_error",
@@ -360,9 +408,10 @@ async def process_file(
 
     shutdown = GracefulShutdown()
 
-    # Initialize checkpoint manager for memory mode
+    # Initialize checkpoint manager for memory mode and signal history recorder
     engine = get_engine()
     checkpoint_mgr = CheckpointManager(engine)
+    recorder = SignalHistoryRecorder(engine)
 
     # Decide streaming vs memory based on file size
     # Streaming is better for large files (>100 clusters typically)
@@ -380,12 +429,13 @@ async def process_file(
                 shutdown,
                 resume=resume,
                 checkpoint_mgr=checkpoint_mgr,
+                recorder=recorder,
             )
         else:
             # Streaming mode: no checkpointing support
             logger.info("using_streaming_mode", clusters=cluster_count, checkpointing="disabled")
             output_path, stats, elapsed = await enrich_streaming(
-                file_path, api_key, max_concurrent, batch_size, shutdown
+                file_path, api_key, max_concurrent, batch_size, shutdown, recorder
             )
     else:
         output_path, stats, elapsed = await enrich_small_file(
@@ -395,6 +445,7 @@ async def process_file(
             shutdown,
             resume=resume,
             checkpoint_mgr=checkpoint_mgr,
+            recorder=recorder,
         )
 
     # Report results
