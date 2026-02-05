@@ -3,12 +3,12 @@
 ## Current Position
 
 **Milestone:** M1 — Codebase Remediation
-**Phase:** 05 of 6 (Async Enricher Parity)
-**Plan:** 2 of 2 complete
-**Status:** Phase 05 complete
-**Last activity:** 2026-02-05 - Completed 05-02-PLAN.md (checkpoint integration)
+**Phase:** 06 of 6 (Production Integration Cleanup)
+**Plan:** 2 of 3 complete
+**Status:** In progress
+**Last activity:** 2026-02-05 - Completed 06-02-PLAN.md (structlog standardization)
 
-**Progress:** █████████████░░ (17/20 plans = 85%)
+**Progress:** ██████████████░ (19/20 plans = 95%)
 
 ## Phase Status
 
@@ -19,7 +19,7 @@
 | 03 | Performance & Scaling | 4 | 3 | ✓ Complete (verified) |
 | 04 | Feature Completeness & Debt Cleanup | 4 | 1 | ✓ Complete (verified) |
 | 05 | Async Enricher Parity | 2 | 1 | ✓ Complete (verified) |
-| 06 | Production Integration Cleanup | 3 | 1 | Pending |
+| 06 | Production Integration Cleanup | 3 | 1 | In progress (2/3) |
 
 **Total:** 20 plans across 6 phases
 
@@ -88,6 +88,8 @@
 | 05-02 | CHECKPOINT_FREQUENCY = 25 for async | Match sync script default for consistency |
 | 05-02 | Streaming mode excluded from checkpointing | Cannot resume mid-stream without full re-parse |
 | 05-02 | Run ID format: async_enrich_{file_stem} | Unique per input file, distinguishes from sync |
+| 06-02 | Custom _before_sleep_structlog for tenacity | stdlib before_sleep_log incompatible with structlog |
+| 06-02 | Debug-level logging for HTTP/DB ops | High-frequency operations, avoid noise |
 
 ## Blockers
 
@@ -226,10 +228,24 @@ None
 - Streaming mode explicitly excluded from checkpointing
 - Tests: 7 passing for checkpoint behavior
 
+## Phase 06 Progress
+
+**Plans:**
+- **Plan 06-01:** Complete - Signal history audit integration
+- **Plan 06-02:** Complete - Structlog standardization in async_client
+- **Plan 06-03:** Pending - (remaining plan)
+
+**Completed in 06-02:**
+- src/async_client/retry.py: Replaced stdlib logging with structlog
+- src/async_client/http_client.py: Added debug logging for session/request lifecycle
+- src/async_client/db_engine.py: Added debug logging for engine lifecycle
+- Custom _before_sleep_structlog callback for tenacity retry logging
+- Tests: 123 passing (1 pre-existing integration test failure unrelated to changes)
+
 ## Session Continuity
 
-**Last session:** 2026-02-05 13:43:00 UTC
-**Stopped at:** Completed 05-02-PLAN.md (checkpoint integration)
+**Last session:** 2026-02-05 16:35:00 UTC
+**Stopped at:** Completed 06-02-PLAN.md (structlog standardization)
 **Resume file:** None
 
 ## Notes
