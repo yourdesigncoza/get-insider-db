@@ -16,6 +16,7 @@ import os
 import sys
 import time
 import threading
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta, date
 from functools import lru_cache
 from pathlib import Path
@@ -69,6 +70,37 @@ class AlphaVantageError(Exception):
 
 class InvalidTickerError(Exception):
     pass
+
+
+@dataclass
+class EnrichmentStats:
+    """Track enrichment success/failure rates."""
+    total_clusters: int = 0
+    price_success: int = 0
+    price_primary_fail: int = 0
+    price_fallback_success: int = 0
+    price_total_fail: int = 0
+    fundamentals_success: int = 0
+    fundamentals_fail: int = 0
+    failed_tickers: List[str] = field(default_factory=list)
+
+    def report(self) -> None:
+        """Log final enrichment statistics."""
+        price_total = self.price_success + self.price_total_fail
+        price_rate = (self.price_success / price_total * 100) if price_total > 0 else 0
+
+        logger.info(
+            f"Enrichment complete: {self.total_clusters} clusters, "
+            f"{self.price_success}/{price_total} prices ({price_rate:.1f}% success), "
+            f"{self.fundamentals_success} fundamentals"
+        )
+
+        if self.price_fallback_success > 0:
+            logger.info(f"YFinance fallback recovered {self.price_fallback_success} prices")
+
+        if self.failed_tickers:
+            unique_failed = list(set(self.failed_tickers))[:20]
+            logger.warning(f"Failed tickers ({len(self.failed_tickers)} total): {unique_failed}")
 
 
 @retry(
@@ -622,10 +654,13 @@ def _get_first_price_record_on_or_after(history: List[Dict], target_date: dateti
             return record
     return None
 
-def enrich_row(row: Dict[str, Any]) -> Dict[str, Any]:
+def enrich_row(row: Dict[str, Any], stats: Optional[EnrichmentStats] = None) -> Dict[str, Any]:
     ticker = row.get("ticker")
     window_end_str = row.get("window_end")
     total_value = row.get("total_value", 0)
+
+    if stats:
+        stats.total_clusters += 1
 
     if not ticker or not window_end_str:
         return row
@@ -710,8 +745,31 @@ def enrich_row(row: Dict[str, Any]) -> Dict[str, Any]:
     base_record = _get_first_price_record_on_or_after(history, entry_date)
     base_price = base_record['close'] if base_record else None
 
-    if enrichment_status == "ok" and not history:
+    # Try YFinance fallback if primary API failed
+    used_yfinance_fallback = False
+    if not history or base_price is None:
+        if stats:
+            stats.price_primary_fail += 1
+        logger.warning(f"Primary API failed for {ticker}, trying YFinance fallback")
+        fallback_price = _fetch_price_yfinance(ticker, entry_date.date())
+        if fallback_price is not None:
+            logger.info(f"YFinance fallback succeeded for {ticker}: {fallback_price}")
+            base_price = fallback_price
+            used_yfinance_fallback = True
+            if stats:
+                stats.price_fallback_success += 1
+        else:
+            if stats:
+                stats.price_total_fail += 1
+                stats.failed_tickers.append(ticker)
+
+    if enrichment_status == "ok" and not history and not used_yfinance_fallback:
         enrichment_status = "no_price_data"
+
+    # Track price success
+    if base_price is not None and stats:
+        if not used_yfinance_fallback:
+            stats.price_success += 1
 
     results = {}
 
@@ -742,6 +800,13 @@ def enrich_row(row: Dict[str, Any]) -> Dict[str, Any]:
     pe_ratio = fund_data.get("peRatio") if fund_data else None
     pb_ratio = fund_data.get("pbRatio") if fund_data else None
     trailing_peg_ratio = fund_data.get("trailingPegRatio") if fund_data else None
+
+    # Track fundamentals success
+    if stats:
+        if fund_data and market_cap is not None:
+            stats.fundamentals_success += 1
+        else:
+            stats.fundamentals_fail += 1
 
     cluster_vs_mcap_pct = None
     if market_cap and total_value and market_cap > 0:
@@ -794,11 +859,12 @@ def process_file(file_path: Path):
         logger.error("Invalid JSON format: 'rows' key missing")
         return
 
+    stats = EnrichmentStats()
     enriched_rows = []
     total = len(data["rows"])
     for i, row in enumerate(data["rows"], 1):
         logger.info(f"  [{i}/{total}] Enriching {row.get('ticker')}...")
-        enriched_rows.append(enrich_row(row))
+        enriched_rows.append(enrich_row(row, stats))
 
     data["rows"] = enriched_rows
 
@@ -808,6 +874,9 @@ def process_file(file_path: Path):
     output_path = file_path.with_name(f"{file_path.stem}_enriched{file_path.suffix}")
     output_path.write_text(json.dumps(data, indent=2, default=str))
     logger.info(f"Done! Enriched data written to: {output_path}")
+
+    # Report enrichment statistics
+    stats.report()
 
 def main():
     global RATE_LIMIT_SECONDS
