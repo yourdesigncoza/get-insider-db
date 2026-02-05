@@ -706,6 +706,24 @@ ALTER TABLE ONLY public.cluster_event_members
     ADD CONSTRAINT cluster_event_members_cluster_id_fkey FOREIGN KEY (cluster_id) REFERENCES public.cluster_events(cluster_id) ON DELETE CASCADE;
 
 
+--
+-- Enrichment checkpointing for crash recovery
+--
+
+CREATE TABLE IF NOT EXISTS public.enrichment_checkpoints (
+    run_id text PRIMARY KEY,
+    last_processed_index integer NOT NULL DEFAULT 0,
+    processed_tickers jsonb NOT NULL DEFAULT '[]'::jsonb,
+    errors jsonb NOT NULL DEFAULT '{}'::jsonb,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+ALTER TABLE public.enrichment_checkpoints OWNER TO myuser;
+
+CREATE INDEX IF NOT EXISTS idx_checkpoint_updated ON public.enrichment_checkpoints (updated_at);
+
+
 -- Completed on 2026-01-26 21:30:56 SAST
 
 --
