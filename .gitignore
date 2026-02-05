@@ -52,6 +52,10 @@ coverage.xml
 
 # Environments
 .env
+.env.*
+.env.local
+.env.*.local
+*.env
 .venv
 env/
 venv/
@@ -94,4 +98,10 @@ logs/
 # OS files
 .DS_Store
 Thumbs.db
+
+# Secrets
+secrets.json
+credentials.json
+*.pem
+*.key
 
