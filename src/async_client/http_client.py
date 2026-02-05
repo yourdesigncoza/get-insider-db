@@ -11,6 +11,8 @@ from typing import Any
 import aiohttp
 from aiohttp import ClientSession, ClientTimeout, TCPConnector
 
+from src.exceptions import RateLimitError
+
 
 class AsyncHTTPClient:
     """
@@ -83,6 +85,7 @@ class AsyncHTTPClient:
             Parsed JSON response as dict.
 
         Raises:
+            RateLimitError: On HTTP 429 rate limit responses.
             aiohttp.ClientError: On connection/protocol errors.
             aiohttp.ClientResponseError: On HTTP error status codes.
         """
@@ -93,6 +96,11 @@ class AsyncHTTPClient:
             async with session.get(
                 full_url, params=params, headers=headers
             ) as response:
+                if response.status == 429:
+                    raise RateLimitError(
+                        f"Rate limit exceeded: {full_url}",
+                        context={"url": full_url, "status": 429},
+                    )
                 response.raise_for_status()
                 return await response.json()
 
