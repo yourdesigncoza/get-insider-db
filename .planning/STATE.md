@@ -82,6 +82,9 @@
 | 04-03 | Remove fetch_recent_buys | Duplicate SQL, cluster_buys.py is canonical |
 | 04-03 | Remove detect_clusters | Unused, cluster_buys.find_cluster_buys is canonical |
 | 04-03 | Keep ClusterConfig, InsiderBuy, ClusterEvent dataclasses | Still referenced elsewhere |
+| 05-01 | Use asyncio.to_thread for YFinance | Wrap blocking library calls to avoid blocking event loop |
+| 05-01 | Tuple return from get_price_history | Returns (prices, used_fallback) for tracking without breaking interface |
+| 05-01 | New yf.Ticker per call | Thread safety for concurrent async usage |
 | 05-02 | CHECKPOINT_FREQUENCY = 25 for async | Match sync script default for consistency |
 | 05-02 | Streaming mode excluded from checkpointing | Cannot resume mid-stream without full re-parse |
 | 05-02 | Run ID format: async_enrich_{file_stem} | Unique per input file, distinguishes from sync |
@@ -200,12 +203,19 @@ None
 ## Phase 05 Verification Summary
 
 - **Score:** 4/4 must-haves verified (100%)
-- **Tests:** 7 new tests for checkpoint integration
+- **Tests:** 37 tests in enrichment_service.py (6 new YFinance fallback tests)
 - **Parity achieved:** YFinance fallback + checkpointing now in async script
 
 **Plans:**
 - **Plan 05-01:** Complete - YFinance async fallback in AsyncEnricher
 - **Plan 05-02:** Complete - Checkpoint integration for crash recovery
+
+**Completed in 05-01:**
+- _fetch_price_yfinance_sync method matching sync script behavior
+- _fetch_price_yfinance_async wrapper using asyncio.to_thread
+- get_price_history modified to try YFinance when API returns empty
+- used_yfinance_fallback field added to enriched cluster output
+- Tests: 6 passing for fallback behavior
 
 **Completed in 05-02:**
 - CheckpointManager integration in enrich_small_file()
