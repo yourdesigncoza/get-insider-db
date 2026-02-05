@@ -4,10 +4,10 @@
 
 **Milestone:** M1 — Codebase Remediation
 **Phase:** 04 in progress
-**Status:** Phase 04 Plan 01 complete
-**Last activity:** 2026-02-05 - Completed 04-01-PLAN.md
+**Status:** Phase 04 Plan 02 complete
+**Last activity:** 2026-02-05 - Completed 04-02-PLAN.md
 
-**Progress:** ████████████░░░ (12/15 plans = 80%)
+**Progress:** █████████████░░ (13/15 plans = 87%)
 
 ## Phase Status
 
@@ -16,7 +16,7 @@
 | 01 | Security Hardening & Data Integrity | 3 | 1 | ✓ Complete (verified) |
 | 02 | Architectural Stabilization & Observability | 4 | 2 | ✓ Complete (verified) |
 | 03 | Performance & Scaling | 4 | 3 | ✓ Complete (verified) |
-| 04 | Feature Completeness & Debt Cleanup | 4 | 1 | ◐ In Progress (1/4) |
+| 04 | Feature Completeness & Debt Cleanup | 4 | 1 | ◐ In Progress (2/4) |
 
 **Total:** 15 plans across 4 phases
 
@@ -72,6 +72,9 @@
 | 04-01 | Claude 3.5 Haiku for AI classification | Cost-effective, fastest response time |
 | 04-01 | Rule-based fallback on API failure | Pipeline reliability over AI accuracy |
 | 04-01 | Singleton client via lru_cache | Consistent with sync config.py pattern |
+| 04-02 | JSONB for checkpoint tickers/errors | Flexible schema for structured data |
+| 04-02 | PostgreSQL upsert for checkpoint saves | Atomic updates without read-modify-write |
+| 04-02 | Default checkpoint frequency 25 rows | Balance I/O overhead vs data loss risk |
 
 ## Blockers
 
@@ -145,6 +148,7 @@ None
 
 **Plans:**
 - **Plan 04-01:** Complete - AI-powered insider classification with Claude Haiku
+- **Plan 04-02:** Complete - Enrichment checkpointing for crash recovery
 
 **Completed in 04-01:**
 - src/llm/ module with Instructor-wrapped Anthropic client
@@ -153,10 +157,17 @@ None
 - Automatic fallback to rule-based classification on API failure
 - Tests: 9 passing for schemas, fallback, and rules
 
+**Completed in 04-02:**
+- enrichment_checkpoints table with JSONB columns
+- src/checkpointing/ module with CheckpointManager class
+- Integrated checkpointing into enrich_clusters_with_price.py
+- --no-resume flag for fresh starts
+- Tests: 12 passing for CRUD and SQL safety
+
 ## Session Continuity
 
-**Last session:** 2026-02-05 12:47:00 UTC
-**Stopped at:** Completed 04-01-PLAN.md
+**Last session:** 2026-02-05 12:48:30 UTC
+**Stopped at:** Completed 04-02-PLAN.md
 **Resume file:** None
 
 ## Notes
