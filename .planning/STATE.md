@@ -3,11 +3,11 @@
 ## Current Position
 
 **Milestone:** M1 — Codebase Remediation
-**Phase:** 04 complete
-**Status:** All Phase 04 plans complete and verified
-**Last activity:** 2026-02-05 - Phase 04 verified (16/16 must-haves)
+**Phase:** 04 complete, gap closure phases 05-06 added
+**Status:** Gap closure phases created from M1 audit
+**Last activity:** 2026-02-05 - Added phases 05-06 to close audit gaps
 
-**Progress:** ███████████████ (15/15 plans = 100%)
+**Progress:** ███████████░░░░ (15/20 plans = 75%)
 
 ## Phase Status
 
@@ -17,8 +17,10 @@
 | 02 | Architectural Stabilization & Observability | 4 | 2 | ✓ Complete (verified) |
 | 03 | Performance & Scaling | 4 | 3 | ✓ Complete (verified) |
 | 04 | Feature Completeness & Debt Cleanup | 4 | 1 | ✓ Complete (verified) |
+| 05 | Async Enricher Parity | 2 | 1 | Pending |
+| 06 | Production Integration Cleanup | 3 | 1 | Pending |
 
-**Total:** 15 plans across 4 phases
+**Total:** 20 plans across 6 phases
 
 ## Decisions Made
 
