@@ -72,6 +72,41 @@ Plans:
 
 ---
 
+### Phase 05: Async Enricher Parity
+**Goal:** Bring async enricher to feature parity with sync (fallback + resume)
+**Status:** Pending
+**Gap Closure:** Closes integration gaps from M1 audit
+
+Plans:
+- [ ] 05-01-PLAN.md - YFinance fallback in async enricher
+- [ ] 05-02-PLAN.md - Checkpointing integration in async enricher
+
+**Depends on:** Phase 03 async infrastructure, Phase 04 checkpointing
+**Closes:**
+- Integration: YFinance fallback → async enricher
+- Integration: Checkpointing → async enricher
+- Flow: Async enrichment gains fallback + resume
+
+---
+
+### Phase 06: Production Integration Cleanup
+**Goal:** Integrate orphaned modules, fix logging/exception inconsistencies
+**Status:** Pending
+**Gap Closure:** Closes tech debt from M1 audit
+
+Plans:
+- [ ] 06-01-PLAN.md - SignalHistoryRecorder integration into enrichment pipeline
+- [ ] 06-02-PLAN.md - Structured logging in async modules
+- [ ] 06-03-PLAN.md - Exception type utilization (raise EnrichmentError, RateLimitError)
+
+**Depends on:** Phase 05 async parity
+**Closes:**
+- Integration: SignalHistoryRecorder → production pipeline
+- Tech debt: stdlib logging → get_logger() in async_client
+- Tech debt: Exception types defined but never raised
+
+---
+
 ## Timeline Estimate
 
 | Sprint | Focus | Key Deliverables |
