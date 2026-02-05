@@ -12,6 +12,9 @@ import aiohttp
 from aiohttp import ClientSession, ClientTimeout, TCPConnector
 
 from src.exceptions import RateLimitError
+from src.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 class AsyncHTTPClient:
@@ -65,6 +68,7 @@ class AsyncHTTPClient:
                     "Accept": "application/json",
                 },
             )
+            logger.debug("http_session_created")
         return self._session
 
     async def get(
@@ -91,6 +95,7 @@ class AsyncHTTPClient:
         """
         session = await self._get_session()
         full_url = f"{self.base_url}{url}" if self.base_url else url
+        logger.debug("http_request", method="GET", url=full_url)
 
         async with self._semaphore:
             async with session.get(
@@ -114,6 +119,7 @@ class AsyncHTTPClient:
             await self._session.close()
             # Allow time for SSL connections to close gracefully
             await asyncio.sleep(0.25)
+            logger.debug("http_session_closed")
         self._session = None
 
     async def __aenter__(self) -> "AsyncHTTPClient":
