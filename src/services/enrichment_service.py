@@ -11,12 +11,16 @@ from datetime import datetime, timedelta, date
 from typing import Any
 
 import aiohttp
+import structlog
+import yfinance as yf
 from dateutil.relativedelta import relativedelta
 from sqlalchemy import text
 
 from src.async_client import AsyncHTTPClient, async_session_factory, async_retry
 from src.cluster_scoring import compute_market_cap_adjusted_score
 from src.exceptions import InvalidTickerError
+
+logger = structlog.get_logger(__name__)
 
 
 # Default configuration from environment
@@ -347,6 +351,108 @@ class AsyncEnricher:
             await session.commit()
 
     # -------------------------------------------------------------------------
+    # YFINANCE FALLBACK METHODS
+    # -------------------------------------------------------------------------
+
+    def _fetch_price_yfinance_sync(self, ticker: str, target_date: date) -> float | None:
+        """
+        Fetch price from YFinance as fallback (blocking, for use with to_thread).
+
+        Creates new yf.Ticker instance per call for thread safety.
+        Requests 7-day window to handle weekends/holidays.
+
+        Args:
+            ticker: Stock ticker symbol.
+            target_date: Target date for price lookup.
+
+        Returns:
+            Float price or None on any error.
+        """
+        try:
+            stock = yf.Ticker(ticker)
+            # Request 7-day range to handle weekends/holidays
+            start = target_date - timedelta(days=7)
+            end = target_date + timedelta(days=1)
+
+            hist = stock.history(
+                start=start.isoformat(),
+                end=end.isoformat(),
+                auto_adjust=True,
+                repair=True,
+            )
+
+            if hist.empty:
+                logger.warning(
+                    "yfinance_no_data",
+                    ticker=ticker,
+                    start=str(start),
+                    end=str(end),
+                )
+                return None
+
+            # Convert index to dates for comparison
+            hist.index = hist.index.date
+
+            # Find closest date <= target_date
+            valid_dates = [d for d in hist.index if d <= target_date]
+            if not valid_dates:
+                logger.warning(
+                    "yfinance_no_valid_date",
+                    ticker=ticker,
+                    target_date=str(target_date),
+                )
+                return None
+
+            closest_date = max(valid_dates)
+            price = float(hist.loc[closest_date, "Close"])
+
+            if closest_date != target_date:
+                logger.debug(
+                    "yfinance_used_alternate_date",
+                    ticker=ticker,
+                    requested=str(target_date),
+                    used=str(closest_date),
+                )
+
+            return price
+        except (ValueError, KeyError, TypeError, AttributeError) as e:
+            logger.error(
+                "yfinance_fallback_failed",
+                ticker=ticker,
+                error=str(e),
+                error_type=type(e).__name__,
+            )
+            return None
+
+    async def _fetch_price_yfinance_async(
+        self, ticker: str, target_date: date
+    ) -> float | None:
+        """
+        Async wrapper for YFinance price fetch using to_thread.
+
+        Runs blocking yfinance call in thread pool to avoid blocking event loop.
+
+        Args:
+            ticker: Stock ticker symbol.
+            target_date: Target date for price lookup.
+
+        Returns:
+            Float price or None on any error.
+        """
+        try:
+            return await asyncio.to_thread(
+                self._fetch_price_yfinance_sync, ticker, target_date
+            )
+        except Exception as e:
+            logger.error(
+                "yfinance_async_failed",
+                ticker=ticker,
+                error=str(e),
+                error_type=type(e).__name__,
+            )
+            return None
+
+    # -------------------------------------------------------------------------
     # API FETCH METHODS
     # -------------------------------------------------------------------------
 
@@ -511,12 +617,12 @@ class AsyncEnricher:
 
     async def get_price_history(
         self, ticker: str, start: datetime, end: datetime
-    ) -> list[dict]:
+    ) -> tuple[list[dict], bool]:
         """
-        Get price history with cache-first pattern.
+        Get price history with cache-first pattern and YFinance fallback.
 
         Checks cache first, fetches from API if missing/incomplete,
-        and saves new data to cache.
+        falls back to YFinance if API returns no data, and saves new data to cache.
 
         Args:
             ticker: Stock ticker symbol.
@@ -524,7 +630,9 @@ class AsyncEnricher:
             end: End date for price range.
 
         Returns:
-            List of price records [{"date": datetime, "close": float}, ...].
+            Tuple of (price_records, used_yfinance_fallback).
+            price_records: List of [{"date": datetime, "close": float}, ...].
+            used_yfinance_fallback: True if YFinance provided the data.
         """
         # Look back 7 days to capture start date if it's a weekend
         fetch_start = start - timedelta(days=7)
@@ -552,18 +660,34 @@ class AsyncEnricher:
             needs_fetch = True
 
         if not needs_fetch:
-            return db_prices
+            return db_prices, False
 
         # 2. Fetch from API
         api_prices = await self._fetch_prices_from_api(ticker, fetch_start, end)
 
-        if not api_prices:
-            return db_prices
+        if api_prices:
+            # 3. Save to cache
+            await self._save_prices_to_cache(ticker, api_prices)
+            return api_prices, False
 
-        # 3. Save to cache
-        await self._save_prices_to_cache(ticker, api_prices)
+        # 4. API returned empty - try YFinance fallback
+        fallback_price = await self._fetch_price_yfinance_async(ticker, start.date())
 
-        return api_prices
+        if fallback_price is not None:
+            logger.info(
+                "yfinance_fallback_used",
+                ticker=ticker,
+                target_date=str(start.date()),
+                price=fallback_price,
+            )
+            # Create synthetic single-point history
+            synthetic_history = [{"date": start, "close": fallback_price}]
+            # Save to cache for future use
+            await self._save_prices_to_cache(ticker, synthetic_history)
+            return synthetic_history, True
+
+        # 5. Both API and YFinance failed, return cached data if any
+        return db_prices, False
 
     async def get_fundamentals(
         self, ticker: str, target_date: datetime
@@ -647,6 +771,7 @@ class AsyncEnricher:
         enrichment_errors: list[str] = []
         history: list[dict] = []
         fund_data: dict | None = None
+        used_yfinance_fallback = False
 
         results = await asyncio.gather(
             self.get_price_history(ticker, entry_date, price_fetch_end),
@@ -654,7 +779,7 @@ class AsyncEnricher:
             return_exceptions=True,
         )
 
-        # Handle price result
+        # Handle price result (now returns tuple: prices, used_fallback)
         if isinstance(results[0], InvalidTickerError):
             enrichment_status = "unsupported_ticker"
             enrichment_errors.append(f"prices: {results[0]}")
@@ -662,7 +787,7 @@ class AsyncEnricher:
             enrichment_status = "error"
             enrichment_errors.append(f"prices: {results[0]}")
         else:
-            history = results[0]
+            history, used_yfinance_fallback = results[0]
 
         # Handle fundamentals result
         if isinstance(results[1], InvalidTickerError):
@@ -730,6 +855,7 @@ class AsyncEnricher:
             {
                 "enrichment_status": enrichment_status,
                 "enrichment_errors": enrichment_errors,
+                "used_yfinance_fallback": used_yfinance_fallback,
                 "price_at_entry": base_price,
                 "market_cap_at_entry": market_cap,
                 "enterprise_value_at_entry": enterprise_value,
