@@ -37,13 +37,15 @@ Plans:
 ---
 
 ### Phase 03: Performance & Scaling
-**Goal:** Transform sync script -> production pipeline
+**Goal:** Transform sync script -> production pipeline (target: 500-2000 clusters)
 
-**Tasks:**
-- P1: Async API integration (asyncio/aiohttp)
-- P2: Streaming data processing (ijson/generators)
-- P2: Resilient retry logic (exponential backoff w/ jitter)
-- P2: Connection pooling tuning (pool_size, max_overflow)
+**Plans:** 4 plans
+
+Plans:
+- [ ] 03-01-PLAN.md - Async client infrastructure (aiohttp, asyncpg, retry)
+- [ ] 03-02-PLAN.md - Streaming JSON processing (ijson)
+- [ ] 03-03-PLAN.md - Async enrichment service (cache-aware, concurrent)
+- [ ] 03-04-PLAN.md - Async CLI script integration + verification
 
 **Depends on:** Phase 02 error handling
 **Verification:** 500+ clusters enriched without memory issues, <5min for 100 clusters
