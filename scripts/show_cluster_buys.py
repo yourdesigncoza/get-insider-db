@@ -16,13 +16,13 @@ if str(ROOT) not in sys.path:
 
 try:
     from tabulate import tabulate
-except Exception:  # pragma: no cover - optional dependency
+except ImportError:  # Optional dependency - graceful degradation
     tabulate = None
 try:
     from rich.console import Console
     from rich.table import Table
     from rich import box
-except Exception:  # pragma: no cover - optional dependency
+except ImportError:  # Optional dependency - graceful degradation
     Console = None
     Table = None
 
