@@ -20,6 +20,7 @@ from tenacity import (
     wait_exponential_jitter,
 )
 
+from src.exceptions import RateLimitError
 from src.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -33,9 +34,12 @@ def _is_retryable_http_error(exc: BaseException) -> bool:
     Check if an HTTP error should be retried.
 
     Retries on:
+    - RateLimitError (explicit rate limit exception)
     - Rate limits (429)
     - Server errors (500, 502, 503, 504)
     """
+    if isinstance(exc, RateLimitError):
+        return True
     if isinstance(exc, aiohttp.ClientResponseError):
         return exc.status in {429, 500, 502, 503, 504}
     return False
@@ -94,6 +98,7 @@ def async_retry(
         retry=(
             retry_if_exception_type(aiohttp.ClientError)
             | retry_if_exception_type(asyncio.TimeoutError)
+            | retry_if_exception_type(RateLimitError)
             | retry_if_exception(_is_retryable_http_error)
         ),
         before_sleep=_before_sleep_structlog,
