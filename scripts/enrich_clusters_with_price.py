@@ -32,6 +32,7 @@ from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_excep
 # Import project config
 # Ensure root is in pythonpath if running as script
 sys.path.append(os.getcwd())
+from src.checkpointing import CheckpointManager
 from src.config import get_engine
 from src.cluster_scoring import compute_market_cap_adjusted_score
 from src.exceptions import EnrichmentError, InvalidTickerError, RateLimitError
@@ -50,6 +51,7 @@ FUNDAMENTALS_MAX_LOOKBACK_DAYS = int(os.getenv("FUNDAMENTALS_MAX_LOOKBACK_DAYS",
 FUNDAMENTALS_MAX_FORWARD_DAYS = int(os.getenv("FUNDAMENTALS_MAX_FORWARD_DAYS", "120"))
 FINANCIAL_METRICS_MAX_LIMIT = int(os.getenv("FINANCIAL_METRICS_MAX_LIMIT", "200"))
 PRICE_LOOKAHEAD_BUFFER_DAYS = int(os.getenv("PRICE_LOOKAHEAD_BUFFER_DAYS", "10"))
+CHECKPOINT_FREQUENCY = int(os.getenv("CHECKPOINT_FREQUENCY", "25"))
 
 # Global Rate Limiting
 # Default 0.5s (2 req/sec), minimum 0.1s (10 req/sec) for safety
@@ -840,7 +842,13 @@ def enrich_row(row: Dict[str, Any], stats: Optional[EnrichmentStats] = None) -> 
     })
     return new_row
 
-def process_file(file_path: Path):
+def process_file(file_path: Path, resume: bool = True):
+    """Process a cluster export file with checkpoint support.
+
+    Args:
+        file_path: Path to the JSON file to enrich.
+        resume: If True, resume from last checkpoint (default). If False, start fresh.
+    """
     if not file_path.exists():
         logger.error(f"File not found: {file_path}")
         return
@@ -857,30 +865,83 @@ def process_file(file_path: Path):
         logger.error("Invalid JSON format: 'rows' key missing")
         return
 
+    # Initialize checkpoint manager
+    engine = get_engine()
+    checkpoint_mgr = CheckpointManager(engine)
+    run_id = f"enrich_{file_path.stem}"
+
+    rows = data["rows"]
+    total = len(rows)
+
+    # Check for existing checkpoint
+    start_index = 0
+    processed_tickers: List[str] = []
+    errors: Dict[str, str] = {}
+
+    if resume:
+        checkpoint = checkpoint_mgr.get_checkpoint(run_id)
+        if checkpoint:
+            start_index = checkpoint["last_index"] + 1
+            processed_tickers = list(checkpoint["processed_tickers"])
+            errors = dict(checkpoint["errors"])
+            logger.info(f"Resuming from checkpoint: row {start_index}/{total}")
+
+    # Process rows with checkpointing
+    # Keep already processed rows as-is from the original data
+    enriched_rows = rows[:start_index]
+
     stats = EnrichmentStats()
-    enriched_rows = []
-    total = len(data["rows"])
-    for i, row in enumerate(data["rows"], 1):
-        logger.info(f"  [{i}/{total}] Enriching {row.get('ticker')}...")
-        enriched_rows.append(enrich_row(row, stats))
+    stats.total_clusters = start_index  # Account for already processed
+
+    for i in range(start_index, total):
+        row = rows[i]
+        ticker = row.get("ticker", f"row_{i}")
+        logger.info(f"  [{i+1}/{total}] Enriching {ticker}...")
+
+        try:
+            enriched = enrich_row(row, stats)
+            enriched_rows.append(enriched)
+            processed_tickers.append(ticker)
+        except (ValueError, KeyError, TypeError, AttributeError) as e:
+            logger.error(f"Error enriching {ticker}: {e}", ticker=ticker, error=str(e), error_type=type(e).__name__)
+            errors[ticker] = str(e)
+            enriched_rows.append(row)  # Keep original on error
+
+        # Checkpoint periodically
+        if (i + 1) % CHECKPOINT_FREQUENCY == 0:
+            checkpoint_mgr.save_checkpoint(
+                run_id=run_id,
+                last_index=i,
+                processed_tickers=processed_tickers,
+                errors=errors,
+            )
+            logger.info(f"  Checkpoint saved at row {i + 1}/{total}")
 
     data["rows"] = enriched_rows
 
     if "metadata" in data:
         data["metadata"]["enriched_at"] = datetime.now().isoformat()
+        data["metadata"]["enrichment_errors"] = len(errors)
 
     output_path = file_path.with_name(f"{file_path.stem}_enriched{file_path.suffix}")
     output_path.write_text(json.dumps(data, indent=2, default=str))
+
+    # Clear checkpoint on successful completion
+    checkpoint_mgr.clear_checkpoint(run_id)
     logger.info(f"Done! Enriched data written to: {output_path}")
+
+    if errors:
+        logger.warning(f"Errors encountered: {len(errors)} tickers")
 
     # Report enrichment statistics
     stats.report()
 
 def main():
     global RATE_LIMIT_SECONDS
-    parser = argparse.ArgumentParser(description="Enrich cluster JSON with Tiingo prices and fundamentals")
+    parser = argparse.ArgumentParser(description="Enrich cluster JSON with prices and fundamentals")
     parser.add_argument("file_path", type=str, help="Path to the JSON file to enrich")
     parser.add_argument("--rate_limit", type=float, default=1.0, help="Minimum seconds between API calls (e.g. 2.0 for free tier)")
+    parser.add_argument("--no-resume", action="store_true", help="Start fresh, ignore existing checkpoint")
     args = parser.parse_args()
 
     # Configure logging
@@ -897,7 +958,7 @@ def main():
         logger.error("FINANCIAL_DATASETS_API_KEY environment variable is not set. Please add it to your .env file")
         sys.exit(1)
 
-    process_file(Path(args.file_path))
+    process_file(Path(args.file_path), resume=not args.no_resume)
 
 if __name__ == "__main__":
     main()
