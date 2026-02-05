@@ -39,7 +39,7 @@ def test_cluster_score_normalization():
     )
     print(f"High case: {score_high}")
     assert 80 < score_high < 90, f"Expected 80-90, got {score_high}"
-    
+
     # Case 3: Extreme outlier
     score_extreme = compute_cluster_score(
         people=20,

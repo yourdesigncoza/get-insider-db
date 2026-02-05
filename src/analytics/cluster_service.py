@@ -42,7 +42,7 @@ class ClusterConfig:
     min_value_usd: float = 100_000.0  # Per person conviction filter (optional usage)
     min_ownership_delta_pct: float = 0.20 # 20%
     min_total_cluster_value_usd: float = 500_000.0
-    
+
     # Expiry settings
     expiry_days_trading: int = 60
     no_follow_through_days: int = 20
@@ -81,7 +81,7 @@ def get_role_weight(title: str) -> float:
     title_u = title.upper()
     # Simple keyword matching, prioritized by specific roles
     best_weight = 0.0
-    
+
     for role, weight in ROLE_WEIGHTS.items():
         if role in title_u:
             # We want the max weight found? Or prioritized?
@@ -90,10 +90,10 @@ def get_role_weight(title: str) -> float:
             # So we should probably take the highest weight found?
             # Actually, CFO (1.3) is highest. So max is correct strategy.
             best_weight = max(best_weight, weight)
-            
+
     if best_weight > 0:
         return best_weight
-        
+
     return 1.0 # Default
 
 def fetch_recent_buys(engine: Engine, lookback_days: int = 120) -> pd.DataFrame:
@@ -101,7 +101,7 @@ def fetch_recent_buys(engine: Engine, lookback_days: int = 120) -> pd.DataFrame:
     Fetch qualifying buys (Open Market 'P') for the last N days.
     """
     query = text("""
-        SELECT 
+        SELECT
             s.ticker,
             s.insider_name,
             s.insider_title,
@@ -118,12 +118,12 @@ def fetch_recent_buys(engine: Engine, lookback_days: int = 120) -> pd.DataFrame:
           AND s.ticker IS NOT NULL
         ORDER BY s.ticker, s.transaction_date
     """)
-    
+
     # Note: Interval syntax might vary by DB. Postgres uses 'N day'.
     # The snippet above uses generic param style.
     # Postgres specific:
     query = text("""
-        SELECT 
+        SELECT
             s.ticker,
             s.insider_name,
             s.insider_title,
@@ -140,10 +140,10 @@ def fetch_recent_buys(engine: Engine, lookback_days: int = 120) -> pd.DataFrame:
           AND s.ticker IS NOT NULL
         ORDER BY s.ticker, s.transaction_date
     """)
-    
+
     with engine.connect() as conn:
         df = pd.read_sql(query, conn, params={"days": lookback_days})
-        
+
     return df
 
 def detect_clusters(buys_df: pd.DataFrame, cfg: ClusterConfig) -> List[ClusterEvent]:
@@ -151,21 +151,21 @@ def detect_clusters(buys_df: pd.DataFrame, cfg: ClusterConfig) -> List[ClusterEv
     Implementation of the sliding window logic from cluster-recap.md
     """
     events: List[ClusterEvent] = []
-    
+
     if buys_df.empty:
         return events
-        
+
     # Pre-process buys into objects
     # We need to dedupe or handle multiple rows per filing?
     # The DataFrame has line items.
     # For cluster detection, we care about "Insider X bought on Day Y".
     # If Insider X has 5 rows on Day Y, that's 1 buy event for them.
-    
+
     # Group by Ticker -> then logic
     for ticker, group in buys_df.groupby("ticker"):
         # Sort by date
         group = group.sort_values("transaction_date")
-        
+
         # Convert to objects
         buy_objects: List[InsiderBuy] = []
         for _, row in group.iterrows():
@@ -175,8 +175,8 @@ def detect_clusters(buys_df: pd.DataFrame, cfg: ClusterConfig) -> List[ClusterEv
             if " LP" in name or " FUND" in name or " TRUST" in name:
                 # Ideally use the classification table here.
                 # For V1, we trust the input or rely on downstream strictness.
-                pass 
-                
+                pass
+
             # Delta calculation (simplified)
             shares = float(row["shares"] or 0)
             owned_after = float(row["shares_owned_after"] or 0)
@@ -185,7 +185,7 @@ def detect_clusters(buys_df: pd.DataFrame, cfg: ClusterConfig) -> List[ClusterEv
                 prior = owned_after - shares
                 if prior > 0:
                     delta = shares / prior
-            
+
             obj = InsiderBuy(
                 ticker=ticker,
                 insider_id=normalize_insider_name(name),
@@ -201,24 +201,24 @@ def detect_clusters(buys_df: pd.DataFrame, cfg: ClusterConfig) -> List[ClusterEv
                 ownership_delta_pct=delta
             )
             buy_objects.append(obj)
-            
+
         # Sliding window
         left = 0
         n = len(buy_objects)
-        
+
         # We need to find the *first* time condition is met.
         # But iterating right pointer means we examine "Window ending at Right".
-        
+
         processed_signals = []
-        
+
         for right in range(n):
             current_buy = buy_objects[right]
             window_end = current_buy.trade_date
             if isinstance(window_end, pd.Timestamp):
                 window_end = window_end.date()
-                
+
             window_start_limit = window_end - timedelta(days=cfg.window_days)
-            
+
             # Advance left
             while left < right:
                 l_date = buy_objects[left].trade_date
@@ -228,30 +228,30 @@ def detect_clusters(buys_df: pd.DataFrame, cfg: ClusterConfig) -> List[ClusterEv
                     left += 1
                 else:
                     break
-            
+
             # Current window buys
             window_buys = buy_objects[left : right + 1]
-            
+
             # Check criteria
             unique_insiders = {b.insider_id for b in window_buys}
-            
+
             if len(unique_insiders) >= cfg.min_unique_insiders:
                 total_val = sum(b.value_usd for b in window_buys)
-                
+
                 if total_val >= cfg.min_total_cluster_value_usd:
                     # FOUND A SIGNAL
-                    
+
                     # Calculate Score
                     score = 0.0
                     for b in window_buys:
                         w = get_role_weight(b.insider_title)
                         # "normalize buy size lightly" - logic from recap: w * (value ** 0.5)
                         score += w * (b.value_usd ** 0.5)
-                        
+
                     # Create Event
                     # Expiry logic: signal_date + 60 trading days (approx 85 calendar days)
-                    expiry = window_end + timedelta(days=85) 
-                    
+                    expiry = window_end + timedelta(days=85)
+
                     evt = ClusterEvent(
                         ticker=ticker,
                         window_start=min(b.trade_date for b in window_buys) if not isinstance(min(b.trade_date for b in window_buys), pd.Timestamp) else min(b.trade_date for b in window_buys).date(),
@@ -264,20 +264,20 @@ def detect_clusters(buys_df: pd.DataFrame, cfg: ClusterConfig) -> List[ClusterEv
                         expiry_date=expiry
                     )
                     processed_signals.append(evt)
-        
+
         # Dedupe overlap - "Simple heuristic: if events overlap heavily, keep the earliest signal_date"
         # Logic from recap:
         # Sort by signal date.
         # If new event starts <= prev event end, it's an overlap.
         # Keep prev unless new is "meaningfully" better.
-        
+
         deduped = []
         if processed_signals:
             # Sort by signal date
             processed_signals.sort(key=lambda x: x.signal_date)
-            
+
             current_cluster = processed_signals[0]
-            
+
             for next_evt in processed_signals[1:]:
                 # Overlap check: does next start before current ends?
                 # Actually, recap says: "if events overlap heavily"
@@ -287,7 +287,7 @@ def detect_clusters(buys_df: pd.DataFrame, cfg: ClusterConfig) -> List[ClusterEv
                     # Recap: "overlap -> keep the earlier signal (prev), unless this one has meaningfully more insiders/value"
                     is_better = (next_evt.unique_insiders > current_cluster.unique_insiders) or \
                                 (next_evt.total_value_usd > current_cluster.total_value_usd * 1.5)
-                                
+
                     if is_better:
                         current_cluster = next_evt # Upgrade to the stronger signal
                     else:
@@ -297,10 +297,10 @@ def detect_clusters(buys_df: pd.DataFrame, cfg: ClusterConfig) -> List[ClusterEv
                     # Non-overlapping, save current and move to next
                     deduped.append(current_cluster)
                     current_cluster = next_evt
-            
+
             deduped.append(current_cluster)
             events.extend(deduped)
-            
+
     return events
 
 def save_events_to_db(events: List[ClusterEvent], engine: Engine):
@@ -313,24 +313,24 @@ def save_events_to_db(events: List[ClusterEvent], engine: Engine):
 
     # In a real system, we might want to UPSERT or check existence more carefully.
     # For now, we'll insert if not exists.
-    
+
     with engine.begin() as conn: # Transaction
         for evt in events:
             # Check existence
             exists = conn.execute(text(
                 "SELECT cluster_id FROM cluster_events WHERE ticker = :ticker AND signal_date = :date"
             ), {"ticker": evt.ticker, "date": evt.signal_date}).fetchone()
-            
+
             if exists:
                 cluster_id = exists[0]
                 # Update?
                 continue
-                
+
             # Insert Cluster
             res = conn.execute(text("""
                 INSERT INTO cluster_events (
-                    ticker, window_start, window_end, signal_date, 
-                    unique_insiders, total_value_usd, conviction_score, 
+                    ticker, window_start, window_end, signal_date,
+                    unique_insiders, total_value_usd, conviction_score,
                     expiry_date, status
                 ) VALUES (
                     :ticker, :w_start, :w_end, :sig_date,
@@ -349,12 +349,12 @@ def save_events_to_db(events: List[ClusterEvent], engine: Engine):
                 "status": evt.status
             })
             cluster_id = res.fetchone()[0]
-            
+
             # Insert Members
             # Group buys by (insider, date) to avoid PK violation if same person bought twice same day
-            # Though our PK is (cluster_id, insider_id, trade_date). 
+            # Though our PK is (cluster_id, insider_id, trade_date).
             # If same person bought twice on same day, we should sum it or insert one record.
-            
+
             # Let's aggregate member buys per day
             member_map = {}
             for b in evt.buys:
@@ -374,7 +374,7 @@ def save_events_to_db(events: List[ClusterEvent], engine: Engine):
                 m["value"] += b.value_usd
                 m["price_sum"] += b.price * b.shares # Weighted avg later
                 m["count"] += 1
-                
+
             for (ins_id, t_date), data in member_map.items():
                 avg_price = data["price_sum"] / data["shares"] if data["shares"] else 0
                 conn.execute(text("""
@@ -405,16 +405,16 @@ def run_backfill(lookback_days: int = 365):
     print(f"Fetching buys for last {lookback_days} days...")
     df = fetch_recent_buys(engine, lookback_days)
     print(f"Found {len(df)} transactions.")
-    
+
     cfg = ClusterConfig(
         min_unique_insiders=3,
         min_total_cluster_value_usd=500_000 # As per recap v1 default
     )
-    
+
     print("Detecting clusters...")
     events = detect_clusters(df, cfg)
     print(f"Detected {len(events)} cluster events.")
-    
+
     print("Saving to DB...")
     save_events_to_db(events, engine)
     print("Done.")

@@ -206,4 +206,4 @@ HTTP Error 400 for URL: https://api.financialdatasets.ai/prices/
 Response: {"error":"Invalid ticker","message":"Please provide a valid ticker from https://www.sec.gov/files/company_tickers.json"}
 Warning: Error fetching history for CIT: RetryError[<Future at 0x764a591b2250 state=finished raised HTTPError>]
 Done! Enriched data written to: exports/cluster_runs/clusters_wd10_lb365_minins3_minrole15_minval0_mintrade0_limit200_minscore60.0_maxfund0.25_20251218T161809_enriched.json
-(base) laudes@laudes-MS-7B79:~/zoot/projects/get-insider-db$ 
+(base) laudes@laudes-MS-7B79:~/zoot/projects/get-insider-db$

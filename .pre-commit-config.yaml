@@ -37,7 +37,7 @@ repos:
         entry: bash -c
         args:
           - -c
-          - 'git diff --cached --name-only | grep -E "^\.env" && echo "ERROR: .env file detected in commit - remove from staging" && exit 1 || exit 0'
+          - 'git diff --cached --name-only | grep -E "(^|/)\.env" && echo "ERROR: .env file detected in commit - remove from staging" && exit 1 || exit 0'
         language: system
         pass_filenames: false
         stages: [commit]

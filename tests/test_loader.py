@@ -46,7 +46,7 @@ def test_load_file_uses_copy_expert(mock_read_csv):
 
     # Assertions
     assert rows_inserted == 2 # Based on SAMPLE_TSV_CONTENT
-    
+
     # Verify pd.read_csv was called once with the file path (even if not used internally now)
     mock_read_csv.assert_called_once_with(mock_file_path, sep="\t", dtype=str)
 
@@ -58,7 +58,7 @@ def test_load_file_uses_copy_expert(mock_read_csv):
     expected_sql_prefix = f"COPY public.{table_name} (\"ACCESSION_NUMBER\",\"FILING_DATE\",\"ISSUERCIK\") FROM STDIN WITH (FORMAT CSV, DELIMITER E'\\t', NULL '')"
     args, _ = mock_cursor.copy_expert.call_args
     assert args[0].strip().startswith(expected_sql_prefix.strip())
-    
+
     # Check the buffer content passed to copy_expert
     buffer_content = args[1].read()
     expected_buffer_content = "0000000001-00-000001\t2023-01-01\t12345\n0000000002-00-000002\t2023-01-02\t67890\n"
@@ -74,7 +74,7 @@ def test_load_file_handles_read_error(mock_read_csv):
     """
     mock_engine = MagicMock()
     mock_file_path = MagicMock()
-    
+
     # Simulate an error during pandas.read_csv
     mock_read_csv.side_effect = Exception("File read error")
 
@@ -83,7 +83,7 @@ def test_load_file_handles_read_error(mock_read_csv):
         assert False, "Expected an exception to be raised"
     except Exception as e:
         assert str(e) == "File read error"
-    
+
     # Ensure no database interaction occurred if file reading failed
     mock_engine.connect.assert_not_called()
 
@@ -99,7 +99,7 @@ def test_load_file_handles_db_error(mock_read_csv):
     mock_engine_connect.connection = mock_dbapi_conn
     mock_engine = MagicMock()
     mock_engine.connect.return_value.__enter__.return_value = mock_engine_connect
-    
+
     # Ensure pd.read_csv returns a valid DataFrame for this test
     mock_read_csv.return_value = pd.DataFrame({
         'ACCESSION_NUMBER': ['0000000001-00-000001'],
@@ -119,6 +119,6 @@ def test_load_file_handles_db_error(mock_read_csv):
         assert False, "Expected an exception to be raised"
     except Exception as e:
         assert str(e) == "Database copy error"
-    
+
     # Ensure commit was NOT called if copy_expert failed
     mock_dbapi_conn.commit.assert_not_called()

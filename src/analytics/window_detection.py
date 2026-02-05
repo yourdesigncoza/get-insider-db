@@ -63,4 +63,3 @@ def best_qualifying_window_indices(
     if best is None:
         return None
     return best[3], best[4]
-

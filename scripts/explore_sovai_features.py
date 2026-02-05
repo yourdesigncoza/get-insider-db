@@ -57,7 +57,7 @@ def main():
     print("\n--- Applying Feature Engineering to Our Data ---")
     df_our_data = calculate_days_to_file(df_our_data)
     df_our_data = calculate_sale_to_purchase_ratio(df_our_data, lookback_days=90)
-    
+
     print("\n--- Our Data Overview (After Feature Engineering) ---")
     print(df_our_data.info())
     print("\n--- Head of Our Data with New Features ---")

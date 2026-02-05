@@ -2,10 +2,12 @@
 -- PostgreSQL database dump
 --
 
-\restrict f6NlloyUz5qVS6rtUEpjzQ8Q4XykcTXX8UEuVSiueIWV7adodreaE1EkyHetUTD
+\restrict shx8g9GBExn2GICQByKE5vR9t6wThL2OnNsWIC9UfWPQD9dU3NQhi5Y8mJx95pL
 
 -- Dumped from database version 18.1 (Ubuntu 18.1-1.pgdg22.04+2)
 -- Dumped by pg_dump version 18.1 (Ubuntu 18.1-1.pgdg22.04+2)
+
+-- Started on 2026-01-26 21:30:46 SAST
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -24,6 +26,7 @@ SET default_tablespace = '';
 SET default_table_access_method = heap;
 
 --
+-- TOC entry 232 (class 1259 OID 17727)
 -- Name: cluster_event_members; Type: TABLE; Schema: public; Owner: myuser
 --
 
@@ -44,6 +47,7 @@ CREATE TABLE public.cluster_event_members (
 ALTER TABLE public.cluster_event_members OWNER TO myuser;
 
 --
+-- TOC entry 231 (class 1259 OID 17702)
 -- Name: cluster_events; Type: TABLE; Schema: public; Owner: myuser
 --
 
@@ -69,6 +73,7 @@ CREATE TABLE public.cluster_events (
 ALTER TABLE public.cluster_events OWNER TO myuser;
 
 --
+-- TOC entry 233 (class 1259 OID 17746)
 -- Name: cluster_events_active_window; Type: VIEW; Schema: public; Owner: myuser
 --
 
@@ -88,6 +93,7 @@ CREATE VIEW public.cluster_events_active_window AS
 ALTER VIEW public.cluster_events_active_window OWNER TO myuser;
 
 --
+-- TOC entry 230 (class 1259 OID 17701)
 -- Name: cluster_events_cluster_id_seq; Type: SEQUENCE; Schema: public; Owner: myuser
 --
 
@@ -102,6 +108,8 @@ CREATE SEQUENCE public.cluster_events_cluster_id_seq
 ALTER SEQUENCE public.cluster_events_cluster_id_seq OWNER TO myuser;
 
 --
+-- TOC entry 3491 (class 0 OID 0)
+-- Dependencies: 230
 -- Name: cluster_events_cluster_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: myuser
 --
 
@@ -109,6 +117,7 @@ ALTER SEQUENCE public.cluster_events_cluster_id_seq OWNED BY public.cluster_even
 
 
 --
+-- TOC entry 222 (class 1259 OID 17521)
 -- Name: form345_deriv_trans; Type: TABLE; Schema: public; Owner: myuser
 --
 
@@ -161,6 +170,7 @@ CREATE TABLE public.form345_deriv_trans (
 ALTER TABLE public.form345_deriv_trans OWNER TO myuser;
 
 --
+-- TOC entry 221 (class 1259 OID 17516)
 -- Name: form345_nonderiv_trans; Type: TABLE; Schema: public; Owner: myuser
 --
 
@@ -199,6 +209,7 @@ CREATE TABLE public.form345_nonderiv_trans (
 ALTER TABLE public.form345_nonderiv_trans OWNER TO myuser;
 
 --
+-- TOC entry 220 (class 1259 OID 17507)
 -- Name: form345_reportingowner; Type: TABLE; Schema: public; Owner: myuser
 --
 
@@ -222,6 +233,7 @@ CREATE TABLE public.form345_reportingowner (
 ALTER TABLE public.form345_reportingowner OWNER TO myuser;
 
 --
+-- TOC entry 219 (class 1259 OID 17502)
 -- Name: form345_submission; Type: TABLE; Schema: public; Owner: myuser
 --
 
@@ -246,6 +258,7 @@ CREATE TABLE public.form345_submission (
 ALTER TABLE public.form345_submission OWNER TO myuser;
 
 --
+-- TOC entry 229 (class 1259 OID 17696)
 -- Name: insider_buy_signals; Type: VIEW; Schema: public; Owner: myuser
 --
 
@@ -277,6 +290,7 @@ CREATE VIEW public.insider_buy_signals AS
 ALTER VIEW public.insider_buy_signals OWNER TO myuser;
 
 --
+-- TOC entry 228 (class 1259 OID 17674)
 -- Name: insider_entities; Type: TABLE; Schema: public; Owner: myuser
 --
 
@@ -296,6 +310,7 @@ CREATE TABLE public.insider_entities (
 ALTER TABLE public.insider_entities OWNER TO myuser;
 
 --
+-- TOC entry 227 (class 1259 OID 17673)
 -- Name: insider_entities_id_seq; Type: SEQUENCE; Schema: public; Owner: myuser
 --
 
@@ -311,6 +326,8 @@ CREATE SEQUENCE public.insider_entities_id_seq
 ALTER SEQUENCE public.insider_entities_id_seq OWNER TO myuser;
 
 --
+-- TOC entry 3492 (class 0 OID 0)
+-- Dependencies: 227
 -- Name: insider_entities_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: myuser
 --
 
@@ -318,6 +335,7 @@ ALTER SEQUENCE public.insider_entities_id_seq OWNED BY public.insider_entities.i
 
 
 --
+-- TOC entry 224 (class 1259 OID 17649)
 -- Name: insider_exclusions; Type: TABLE; Schema: public; Owner: myuser
 --
 
@@ -332,6 +350,7 @@ CREATE TABLE public.insider_exclusions (
 ALTER TABLE public.insider_exclusions OWNER TO myuser;
 
 --
+-- TOC entry 223 (class 1259 OID 17648)
 -- Name: insider_exclusions_id_seq; Type: SEQUENCE; Schema: public; Owner: myuser
 --
 
@@ -347,6 +366,8 @@ CREATE SEQUENCE public.insider_exclusions_id_seq
 ALTER SEQUENCE public.insider_exclusions_id_seq OWNER TO myuser;
 
 --
+-- TOC entry 3493 (class 0 OID 0)
+-- Dependencies: 223
 -- Name: insider_exclusions_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: myuser
 --
 
@@ -354,6 +375,7 @@ ALTER SEQUENCE public.insider_exclusions_id_seq OWNED BY public.insider_exclusio
 
 
 --
+-- TOC entry 225 (class 1259 OID 17663)
 -- Name: insider_trades; Type: TABLE; Schema: public; Owner: myuser
 --
 
@@ -385,6 +407,7 @@ CREATE TABLE public.insider_trades (
 ALTER TABLE public.insider_trades OWNER TO myuser;
 
 --
+-- TOC entry 226 (class 1259 OID 17668)
 -- Name: insider_trades_with_title; Type: VIEW; Schema: public; Owner: myuser
 --
 
@@ -433,6 +456,7 @@ CREATE VIEW public.insider_trades_with_title AS
 ALTER VIEW public.insider_trades_with_title OWNER TO myuser;
 
 --
+-- TOC entry 235 (class 1259 OID 17765)
 -- Name: market_fundamentals; Type: TABLE; Schema: public; Owner: myuser
 --
 
@@ -451,6 +475,7 @@ CREATE TABLE public.market_fundamentals (
 ALTER TABLE public.market_fundamentals OWNER TO myuser;
 
 --
+-- TOC entry 234 (class 1259 OID 17753)
 -- Name: market_prices; Type: TABLE; Schema: public; Owner: myuser
 --
 
@@ -466,6 +491,7 @@ CREATE TABLE public.market_prices (
 ALTER TABLE public.market_prices OWNER TO myuser;
 
 --
+-- TOC entry 3299 (class 2604 OID 17705)
 -- Name: cluster_events cluster_id; Type: DEFAULT; Schema: public; Owner: myuser
 --
 
@@ -473,6 +499,7 @@ ALTER TABLE ONLY public.cluster_events ALTER COLUMN cluster_id SET DEFAULT nextv
 
 
 --
+-- TOC entry 3296 (class 2604 OID 17677)
 -- Name: insider_entities id; Type: DEFAULT; Schema: public; Owner: myuser
 --
 
@@ -480,6 +507,7 @@ ALTER TABLE ONLY public.insider_entities ALTER COLUMN id SET DEFAULT nextval('pu
 
 
 --
+-- TOC entry 3294 (class 2604 OID 17652)
 -- Name: insider_exclusions id; Type: DEFAULT; Schema: public; Owner: myuser
 --
 
@@ -487,6 +515,7 @@ ALTER TABLE ONLY public.insider_exclusions ALTER COLUMN id SET DEFAULT nextval('
 
 
 --
+-- TOC entry 3326 (class 2606 OID 17738)
 -- Name: cluster_event_members cluster_event_members_pkey; Type: CONSTRAINT; Schema: public; Owner: myuser
 --
 
@@ -495,6 +524,7 @@ ALTER TABLE ONLY public.cluster_event_members
 
 
 --
+-- TOC entry 3322 (class 2606 OID 17724)
 -- Name: cluster_events cluster_events_pkey; Type: CONSTRAINT; Schema: public; Owner: myuser
 --
 
@@ -503,6 +533,7 @@ ALTER TABLE ONLY public.cluster_events
 
 
 --
+-- TOC entry 3318 (class 2606 OID 17691)
 -- Name: insider_entities insider_entities_pkey; Type: CONSTRAINT; Schema: public; Owner: myuser
 --
 
@@ -511,6 +542,7 @@ ALTER TABLE ONLY public.insider_entities
 
 
 --
+-- TOC entry 3316 (class 2606 OID 17660)
 -- Name: insider_exclusions insider_exclusions_pkey; Type: CONSTRAINT; Schema: public; Owner: myuser
 --
 
@@ -519,6 +551,7 @@ ALTER TABLE ONLY public.insider_exclusions
 
 
 --
+-- TOC entry 3334 (class 2606 OID 17775)
 -- Name: market_fundamentals market_fundamentals_pkey; Type: CONSTRAINT; Schema: public; Owner: myuser
 --
 
@@ -527,6 +560,7 @@ ALTER TABLE ONLY public.market_fundamentals
 
 
 --
+-- TOC entry 3331 (class 2606 OID 17763)
 -- Name: market_prices market_prices_pkey; Type: CONSTRAINT; Schema: public; Owner: myuser
 --
 
@@ -535,6 +569,7 @@ ALTER TABLE ONLY public.market_prices
 
 
 --
+-- TOC entry 3320 (class 2606 OID 17693)
 -- Name: insider_entities uq_insider_entities_normalized_name; Type: CONSTRAINT; Schema: public; Owner: myuser
 --
 
@@ -543,6 +578,7 @@ ALTER TABLE ONLY public.insider_entities
 
 
 --
+-- TOC entry 3323 (class 1259 OID 17726)
 -- Name: idx_cluster_events_active; Type: INDEX; Schema: public; Owner: myuser
 --
 
@@ -550,6 +586,7 @@ CREATE INDEX idx_cluster_events_active ON public.cluster_events USING btree (sta
 
 
 --
+-- TOC entry 3324 (class 1259 OID 17725)
 -- Name: idx_cluster_events_ticker_signal; Type: INDEX; Schema: public; Owner: myuser
 --
 
@@ -557,6 +594,7 @@ CREATE INDEX idx_cluster_events_ticker_signal ON public.cluster_events USING btr
 
 
 --
+-- TOC entry 3327 (class 1259 OID 17744)
 -- Name: idx_cluster_members_cluster; Type: INDEX; Schema: public; Owner: myuser
 --
 
@@ -564,6 +602,7 @@ CREATE INDEX idx_cluster_members_cluster ON public.cluster_event_members USING b
 
 
 --
+-- TOC entry 3328 (class 1259 OID 17745)
 -- Name: idx_cluster_members_ticker_date; Type: INDEX; Schema: public; Owner: myuser
 --
 
@@ -571,6 +610,7 @@ CREATE INDEX idx_cluster_members_ticker_date ON public.cluster_event_members USI
 
 
 --
+-- TOC entry 3332 (class 1259 OID 17776)
 -- Name: idx_market_fundamentals_ticker_date; Type: INDEX; Schema: public; Owner: myuser
 --
 
@@ -578,6 +618,7 @@ CREATE INDEX idx_market_fundamentals_ticker_date ON public.market_fundamentals U
 
 
 --
+-- TOC entry 3329 (class 1259 OID 17764)
 -- Name: idx_market_prices_ticker_date; Type: INDEX; Schema: public; Owner: myuser
 --
 
@@ -585,6 +626,7 @@ CREATE INDEX idx_market_prices_ticker_date ON public.market_prices USING btree (
 
 
 --
+-- TOC entry 3311 (class 1259 OID 17644)
 -- Name: idx_nonderiv_accession; Type: INDEX; Schema: public; Owner: myuser
 --
 
@@ -592,6 +634,7 @@ CREATE INDEX idx_nonderiv_accession ON public.form345_nonderiv_trans USING btree
 
 
 --
+-- TOC entry 3312 (class 1259 OID 17645)
 -- Name: idx_nonderiv_trans_code; Type: INDEX; Schema: public; Owner: myuser
 --
 
@@ -599,6 +642,15 @@ CREATE INDEX idx_nonderiv_trans_code ON public.form345_nonderiv_trans USING btre
 
 
 --
+-- TOC entry 3313 (class 1259 OID 25975)
+-- Name: idx_nonderiv_trans_code_accession; Type: INDEX; Schema: public; Owner: myuser
+--
+
+CREATE INDEX idx_nonderiv_trans_code_accession ON public.form345_nonderiv_trans USING btree ("TRANS_CODE", "ACCESSION_NUMBER");
+
+
+--
+-- TOC entry 3314 (class 1259 OID 17647)
 -- Name: idx_nonderiv_trans_date; Type: INDEX; Schema: public; Owner: myuser
 --
 
@@ -606,6 +658,7 @@ CREATE INDEX idx_nonderiv_trans_date ON public.form345_nonderiv_trans USING btre
 
 
 --
+-- TOC entry 3310 (class 1259 OID 17646)
 -- Name: idx_reportingowner_accession; Type: INDEX; Schema: public; Owner: myuser
 --
 
@@ -613,6 +666,7 @@ CREATE INDEX idx_reportingowner_accession ON public.form345_reportingowner USING
 
 
 --
+-- TOC entry 3306 (class 1259 OID 17642)
 -- Name: idx_subm_accession; Type: INDEX; Schema: public; Owner: myuser
 --
 
@@ -620,6 +674,23 @@ CREATE INDEX idx_subm_accession ON public.form345_submission USING btree ("ACCES
 
 
 --
+-- TOC entry 3307 (class 1259 OID 25976)
+-- Name: idx_subm_filing_date; Type: INDEX; Schema: public; Owner: myuser
+--
+
+CREATE INDEX idx_subm_filing_date ON public.form345_submission USING btree ("FILING_DATE");
+
+
+--
+-- TOC entry 3308 (class 1259 OID 25977)
+-- Name: idx_subm_filing_ticker; Type: INDEX; Schema: public; Owner: myuser
+--
+
+CREATE INDEX idx_subm_filing_ticker ON public.form345_submission USING btree ("FILING_DATE", "ISSUERTRADINGSYMBOL");
+
+
+--
+-- TOC entry 3309 (class 1259 OID 17643)
 -- Name: idx_subm_ticker_filingdate; Type: INDEX; Schema: public; Owner: myuser
 --
 
@@ -627,22 +698,7 @@ CREATE INDEX idx_subm_ticker_filingdate ON public.form345_submission USING btree
 
 
 --
--- Name: idx_nonderiv_trans_code_accession; Type: INDEX; Schema: public; Owner: myuser
--- Performance: Composite index for insider_buy_signals VIEW (filter + join)
---
-
-CREATE INDEX idx_nonderiv_trans_code_accession ON public.form345_nonderiv_trans USING btree ("TRANS_CODE", "ACCESSION_NUMBER");
-
-
---
--- Name: idx_subm_filing_date; Type: INDEX; Schema: public; Owner: myuser
--- Performance: Filing date range queries in cluster detection
---
-
-CREATE INDEX idx_subm_filing_date ON public.form345_submission USING btree ("FILING_DATE");
-
-
---
+-- TOC entry 3335 (class 2606 OID 17739)
 -- Name: cluster_event_members cluster_event_members_cluster_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: myuser
 --
 
@@ -650,9 +706,10 @@ ALTER TABLE ONLY public.cluster_event_members
     ADD CONSTRAINT cluster_event_members_cluster_id_fkey FOREIGN KEY (cluster_id) REFERENCES public.cluster_events(cluster_id) ON DELETE CASCADE;
 
 
+-- Completed on 2026-01-26 21:30:56 SAST
+
 --
 -- PostgreSQL database dump complete
 --
 
-\unrestrict f6NlloyUz5qVS6rtUEpjzQ8Q4XykcTXX8UEuVSiueIWV7adodreaE1EkyHetUTD
-
+\unrestrict shx8g9GBExn2GICQByKE5vR9t6wThL2OnNsWIC9UfWPQD9dU3NQhi5Y8mJx95pL

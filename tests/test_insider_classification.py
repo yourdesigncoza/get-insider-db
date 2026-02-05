@@ -54,7 +54,7 @@ def test_classify_insider_officer_flag():
     name = "Alice Director"
     flags = {"is_director": True}
     result = classify_insider_by_rules(name, None, flags=flags)
-    
+
     assert result["entity_type"] == ENTITY_PERSON
     assert result["confidence"] >= 0.7  # Should be boosted from 0.6
     assert "Flagged as officer/director" in result["rationale"]
@@ -65,6 +65,6 @@ def test_classify_insider_title_boost():
     name = "Bob Executive"
     title = "Chief Executive Officer"
     result = classify_insider_by_rules(name, title)
-    
+
     assert result["entity_type"] == ENTITY_PERSON
     assert "Officer title present" in result["rationale"]

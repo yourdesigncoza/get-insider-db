@@ -40,24 +40,24 @@ def load_file(file_path: pathlib.Path, engine: Engine, table: str = DEFAULT_TABL
     """
     # Read using pandas for robust parsing
     df = pd.read_csv(file_path, sep="\t", dtype=str)
-    
+
     # Normalize column names: strip whitespace and uppercase to match schema
     df.columns = [col.strip().upper() for col in df.columns]
 
     # Convert to CSV buffer for COPY
     output = io.StringIO()
     df.to_csv(
-        output, 
-        sep="\t", 
-        header=False, 
-        index=False, 
+        output,
+        sep="\t",
+        header=False,
+        index=False,
         quoting=csv.QUOTE_MINIMAL,
         escapechar="\\"
     )
     output.seek(0)
 
     # Construct columns string for the COPY command
-    # We quote columns to ensure case sensitivity is respected if needed, 
+    # We quote columns to ensure case sensitivity is respected if needed,
     # though standard SQL is case-insensitive, the schema defined quoted identifiers.
     columns = ",".join([f'"{c}"' for c in df.columns])
 
