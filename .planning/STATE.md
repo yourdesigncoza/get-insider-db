@@ -3,11 +3,11 @@
 ## Current Position
 
 **Milestone:** M1 — Codebase Remediation
-**Phase:** 03 complete
-**Status:** All Phase 03 plans complete, ready for Phase 04
-**Last activity:** 2026-02-05 - Completed 03-04-PLAN.md
+**Phase:** 04 in progress
+**Status:** Phase 04 Plan 01 complete
+**Last activity:** 2026-02-05 - Completed 04-01-PLAN.md
 
-**Progress:** ███████████░░░░ (11/15 plans = 73%)
+**Progress:** ████████████░░░ (12/15 plans = 80%)
 
 ## Phase Status
 
@@ -16,7 +16,7 @@
 | 01 | Security Hardening & Data Integrity | 3 | 1 | ✓ Complete (verified) |
 | 02 | Architectural Stabilization & Observability | 4 | 2 | ✓ Complete (verified) |
 | 03 | Performance & Scaling | 4 | 3 | ✓ Complete (verified) |
-| 04 | Feature Completeness & Debt Cleanup | 4 | 1 | ○ Planned |
+| 04 | Feature Completeness & Debt Cleanup | 4 | 1 | ◐ In Progress (1/4) |
 
 **Total:** 15 plans across 4 phases
 
@@ -69,6 +69,9 @@
 | 03-04 | Auto-detect streaming mode (threshold: 50 clusters) | Balance memory vs overhead |
 | 03-04 | Graceful shutdown via signal handlers | Clean resource cleanup on Ctrl+C |
 | 03-04 | Progress reporting per cluster | Visibility during long enrichment runs |
+| 04-01 | Claude 3.5 Haiku for AI classification | Cost-effective, fastest response time |
+| 04-01 | Rule-based fallback on API failure | Pipeline reliability over AI accuracy |
+| 04-01 | Singleton client via lru_cache | Consistent with sync config.py pattern |
 
 ## Blockers
 
@@ -138,10 +141,22 @@ None
 - EnrichmentStats dataclass for tracking outcomes
 - Tests: 41 integration tests passing
 
+## Phase 04 Progress
+
+**Plans:**
+- **Plan 04-01:** Complete - AI-powered insider classification with Claude Haiku
+
+**Completed in 04-01:**
+- src/llm/ module with Instructor-wrapped Anthropic client
+- EntityType enum and InsiderClassification Pydantic schema
+- Real Claude API integration in classify_insider_with_ai
+- Automatic fallback to rule-based classification on API failure
+- Tests: 9 passing for schemas, fallback, and rules
+
 ## Session Continuity
 
-**Last session:** 2026-02-05 13:10:00 UTC
-**Stopped at:** Completed 03-04-PLAN.md (Phase 03 complete)
+**Last session:** 2026-02-05 12:47:00 UTC
+**Stopped at:** Completed 04-01-PLAN.md
 **Resume file:** None
 
 ## Notes
@@ -154,3 +169,4 @@ Phase 02 started: 2026-02-05
 Phase 02 completed: 2026-02-05
 Phase 03 started: 2026-02-05
 Phase 03 completed: 2026-02-05
+Phase 04 started: 2026-02-05
