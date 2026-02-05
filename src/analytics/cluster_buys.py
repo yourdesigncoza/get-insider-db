@@ -18,6 +18,9 @@ from src.insider_classification import get_or_create_insider_entity, normalize_i
 from src.insider_roles import compute_insider_role_weight
 from src.analytics.feature_engineering import calculate_days_to_file, calculate_sale_to_purchase_ratio
 from src.analytics.window_detection import best_qualifying_window_indices
+from src.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 def _first_nonempty(series: pd.Series) -> str:
@@ -121,6 +124,9 @@ def _classify_insiders(base_df: pd.DataFrame, engine: Engine) -> Dict[str, Dict[
         return {}
 
     unique_rows = base_df.drop_duplicates(subset=["normalized_name"])
+    log = logger.bind(operation="classify_insiders", unique_names=len(unique_rows))
+    log.debug("starting_classification")
+
     classifications: Dict[str, Dict[str, Any]] = {}
     with Session(bind=engine, expire_on_commit=False) as session:
         for _, row in unique_rows.iterrows():
@@ -142,6 +148,7 @@ def _classify_insiders(base_df: pd.DataFrame, engine: Engine) -> Dict[str, Dict[
                 "is_fund_like": bool(entity.is_fund_like),
                 "entity_type": entity.entity_type,
             }
+    log.info("classification_complete", classified=len(classifications))
     return classifications
 
 
@@ -163,6 +170,7 @@ def _get_engine() -> Engine:
     try:
         return get_engine()
     except SQLAlchemyError as exc:  # pragma: no cover - passthrough for clarity
+        logger.error("engine_creation_failed", error=str(exc))
         raise DataAccessError(f"Failed to create engine: {exc}", {"url": DATABASE_URL[:30]}) from exc
 
 
@@ -190,6 +198,14 @@ def find_cluster_buys(
     min_cluster_score: Optional[float] = None,
     as_of_filing_date: Optional[date] = None,
 ) -> pd.DataFrame:
+    log = logger.bind(
+        operation="find_cluster_buys",
+        window_days=window_days,
+        lookback_days=lookback_days,
+        ticker=ticker or "ALL",
+    )
+    log.info("starting_cluster_search")
+
     end_date = as_of_filing_date or get_latest_filing_date()
     start_date = end_date - timedelta(days=lookback_days)
     # Guardrail: Form 4 feeds occasionally contain malformed transaction dates (e.g., year "0024"),
@@ -380,6 +396,7 @@ def find_cluster_buys(
     base_params = params.copy()
     base_params["min_trade_value"] = min_trade_value
     base_df = pd.read_sql_query(text(base_sql), engine, params=base_params)
+    log.debug("base_transactions_loaded", count=len(base_df))
     if base_df.empty:
         return pd.DataFrame(columns=df.columns)
 
@@ -640,6 +657,7 @@ def find_cluster_buys(
         by=["cluster_score", "role_score", "num_insiders", "total_value", "num_fund_like"],
         ascending=[False, False, False, False, True],
     ).reset_index(drop=True)
+    log.info("clusters_found", count=len(merged_df))
     return merged_df
 
 
