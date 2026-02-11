@@ -106,7 +106,7 @@ Plans:
 **Plans**: 1 plan
 
 Plans:
-- [ ] 09-01-PLAN.md -- Add N/A/empty ticker exclusion to SQL queries, metadata documentation, and tests
+- [x] 09-01-PLAN.md -- Add N/A/empty ticker exclusion to SQL queries, metadata documentation, and tests
 
 #### Phase 10: Window Span Validation
 **Goal**: Investigate and correct window merging behavior that creates spans exceeding window_days
@@ -194,7 +194,7 @@ Phases execute in numeric order: 8 → 9 → 10 → 11 → 12 → 13 → 14
 | 6. Production Integration | v1.0 | 3/3 | Complete | 2026-02-05 |
 | 7. Value Filter Enforcement | v1.0 | 2/2 | Complete | 2026-02-11 |
 | 8. Fund Ratio Filtering | v1.1 | 1/1 | Complete | 2026-02-11 |
-| 9. N/A Ticker Exclusion | v1.1 | 0/1 | Not started | - |
+| 9. N/A Ticker Exclusion | v1.1 | 1/1 | Complete | 2026-02-11 |
 | 10. Window Span Validation | v1.1 | 0/1 | Not started | - |
 | 11. Issuer CIK Population | v1.1 | 0/1 | Not started | - |
 | 12. Sale-to-Purchase Debug | v1.1 | 0/1 | Not started | - |
