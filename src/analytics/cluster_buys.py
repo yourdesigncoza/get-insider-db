@@ -20,6 +20,7 @@ from src.analytics.feature_engineering import calculate_days_to_file, calculate_
 from src.analytics.window_detection import best_qualifying_window_indices
 from src.logging_config import get_logger
 from src.models import InsiderEntity
+from src.scoring_config.scoring_weights import CLUSTER_THRESHOLDS
 
 logger = get_logger(__name__)
 
@@ -243,8 +244,8 @@ def find_cluster_buys(
     window_days: int = 10,
     lookback_days: int = 90,
     min_insiders: int = 3,
-    min_total_value: float = 0.0,
-    min_trade_value: float = 0.0,
+    min_total_value: float = CLUSTER_THRESHOLDS.min_total_value_usd,
+    min_trade_value: float = CLUSTER_THRESHOLDS.min_trade_value_usd,
     ticker: Optional[str] = None,
     use_exclusions: bool = True,
     min_role_score: int = 0,
@@ -738,8 +739,8 @@ def find_tradeable_cluster_signals(
     end_filing_date: date,
     window_days: int = 10,
     min_insiders: int = 3,
-    min_total_value: float = 0.0,
-    min_trade_value: float = 0.0,
+    min_total_value: float = CLUSTER_THRESHOLDS.min_total_value_usd,
+    min_trade_value: float = CLUSTER_THRESHOLDS.min_trade_value_usd,
     ticker: Optional[str] = None,
     use_exclusions: bool = True,
     min_role_score: Optional[int] = None,
