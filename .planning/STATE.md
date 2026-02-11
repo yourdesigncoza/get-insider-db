@@ -3,12 +3,12 @@
 ## Current Position
 
 **Milestone:** v1.0 shipped — planning next milestone
-**Phase:** None active
-**Plan:** None active
-**Status:** Ready to plan
-**Last activity:** 2026-02-05 - v1.0 milestone shipped
+**Phase:** 07 of 7 (Value Filter Enforcement)
+**Plan:** 1 of 2
+**Status:** In progress
+**Last activity:** 2026-02-11 - Completed 07-01-PLAN.md
 
-**Progress:** ✓ v1.0 complete (6 phases, 20 plans)
+**Progress:** ✓ v1.0 complete (6 phases, 20 plans) | Phase 07: █░ (1/2 plans)
 
 ## Phase Status
 
@@ -20,8 +20,9 @@
 | 04 | Feature Completeness & Debt Cleanup | 4 | 1 | Complete (verified) |
 | 05 | Async Enricher Parity | 2 | 1 | Complete (verified) |
 | 06 | Production Integration Cleanup | 3 | 1 | ✓ Complete (verified) |
+| 07 | Value Filter Enforcement | 2 | 1 | In progress (1/2 plans) |
 
-**Total:** 20 plans across 6 phases
+**Total:** 22 plans across 7 phases (20 complete, 2 in phase 07)
 
 ## Decisions Made
 
@@ -96,6 +97,9 @@
 | 06-03 | RateLimitError raised before raise_for_status() on 429 | Specific exception type for rate limit handling |
 | 06-03 | RateLimitError added to retry conditions | Redundant coverage in _is_retryable and retry_if_exception_type |
 | 06-03 | EnrichmentError wraps batch failures with context | Structured error metadata (ticker, error, error_type) |
+| 07-01 | Increased w_value from 2.0 to 3.0 | Amplifies dollar value impact in scoring formula |
+| 07-01 | Set min_trade_value_usd to 50_000.0 | Filters out small trades that don't signal meaningful conviction |
+| 07-01 | Wired config into function defaults | Eliminates disconnect where ClusterThresholds defined values but functions defaulted to 0.0 |
 
 ## Blockers
 
@@ -263,11 +267,28 @@ None
 - src/services/enrichment_service.py: EnrichmentError/RateLimitError handling
 - Tests: 130 passing (all modules)
 
+## Phase 07 Verification Summary
+
+- **Score:** 1/2 plans complete (50%)
+- **Tests:** 17 core cluster detection tests passing
+- **Config wiring:** CLUSTER_THRESHOLDS now drives function defaults
+- **Next:** Plan 07-02 (enforcement verification)
+
+**Plans:**
+- **Plan 07-01:** ✓ Complete - Config wiring for value filters
+- **Plan 07-02:** Pending - Enforcement verification
+
+**Completed in 07-01:**
+- src/scoring_config/scoring_weights.py: w_value 2.0→3.0, min_trade_value_usd 0.0→50K
+- src/analytics/cluster_buys.py: CLUSTER_THRESHOLDS wired into find_cluster_buys() and find_tradeable_cluster_signals()
+- tests/test_cluster_scoring.py: Updated assertions for new scoring ranges (62-66)
+- Commits: a4fafe4, 7c90c76
+
 ## Session Continuity
 
-**Last session:** 2026-02-05 16:47:00 UTC
-**Stopped at:** Completed 06-03-PLAN.md (exception type wiring)
-**Resume file:** None
+**Last session:** 2026-02-11 08:40:56 UTC
+**Stopped at:** Completed 07-01-PLAN.md (config wiring)
+**Resume file:** .planning/phases/07-value-filter-enforcement/07-02-PLAN.md
 
 ## Notes
 
