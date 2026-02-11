@@ -27,6 +27,7 @@ except ImportError:  # Optional dependency - graceful degradation
     Table = None
 
 from src.analytics.cluster_buys import get_top_cluster_buys
+from src.scoring_config.scoring_weights import CLUSTER_THRESHOLDS
 
 
 def format_rows(rows: List[Any]) -> None:
@@ -144,8 +145,8 @@ def main() -> None:
     parser.add_argument("--window-days", type=int, default=10, help="Window size in days")
     parser.add_argument("--lookback-days", type=int, default=120, help="Lookback period in days")
     parser.add_argument("--min-insiders", type=int, default=3, help="Minimum distinct insiders")
-    parser.add_argument("--min-total-value", type=float, default=0, help="Minimum total value")
-    parser.add_argument("--min-trade-value", type=float, default=0, help="Minimum per-trade value")
+    parser.add_argument("--min-total-value", type=float, default=CLUSTER_THRESHOLDS.min_total_value_usd, help="Minimum total value (default: from config)")
+    parser.add_argument("--min-trade-value", type=float, default=CLUSTER_THRESHOLDS.min_trade_value_usd, help="Minimum per-trade value (default: from config)")
     parser.add_argument("--ticker", type=str, default=None, help="Optional ticker filter")
     parser.add_argument("--limit", type=int, default=20, help="Number of rows to display")
     parser.add_argument("--min-role-score", type=int, default=0, help="Minimum RoleScore filter")

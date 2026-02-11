@@ -26,6 +26,7 @@ from src.config import get_engine
 from src.analytics.cluster_buys import find_tradeable_cluster_signals
 from src.exceptions import EnrichmentError, DataAccessError
 from src.logging_config import configure_logging, get_logger
+from src.scoring_config.scoring_weights import CLUSTER_THRESHOLDS
 
 configure_logging()
 logger = get_logger(__name__)
@@ -199,8 +200,8 @@ def main() -> None:
     p.add_argument("--end-filing-date", required=True, help="YYYY-MM-DD")
     p.add_argument("--window-days", type=int, default=10)
     p.add_argument("--min-insiders", type=int, default=3)
-    p.add_argument("--min-total-value", type=float, default=0.0)
-    p.add_argument("--min-trade-value", type=float, default=0.0)
+    p.add_argument("--min-total-value", type=float, default=CLUSTER_THRESHOLDS.min_total_value_usd, help="Minimum total value (default: from config)")
+    p.add_argument("--min-trade-value", type=float, default=CLUSTER_THRESHOLDS.min_trade_value_usd, help="Minimum per-trade value (default: from config)")
     p.add_argument("--min-role-score", type=int, default=None)
     p.add_argument("--min-people", type=int, default=None)
     p.add_argument("--min-cluster-score", type=float, default=None)
