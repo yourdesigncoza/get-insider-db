@@ -288,7 +288,8 @@ def find_cluster_buys(
             WHERE s.filing_date BETWEEN :start_date AND :end_date
               AND s.transaction_date BETWEEN :min_transaction_date AND :end_date
               AND s.ticker IS NOT NULL
-              AND s.ticker <> 'NONE'
+              AND s.ticker <> ''
+              AND s.ticker NOT IN ('NONE', 'none', 'N/A', 'n/a', 'NA', 'na')
               {value_filter}
               {exclusions_clause}
             {ticker_filter}
@@ -444,7 +445,8 @@ def find_cluster_buys(
         WHERE filing_date BETWEEN :start_date AND :end_date
           AND transaction_date BETWEEN :min_transaction_date AND :end_date
           AND ticker IS NOT NULL
-          AND ticker <> 'NONE'
+          AND ticker <> ''
+          AND ticker NOT IN ('NONE', 'none', 'N/A', 'n/a', 'NA', 'na')
           {base_value_filter}
           {base_exclusions}
         {base_ticker_filter}
@@ -453,7 +455,30 @@ def find_cluster_buys(
     base_params["min_trade_value"] = min_trade_value
     base_df = pd.read_sql_query(text(base_sql), engine, params=base_params)
     log.debug("base_transactions_loaded", count=len(base_df))
+
+    # Count transactions excluded by invalid-ticker filters (lightweight single COUNT query)
+    invalid_ticker_sql = """
+        SELECT COUNT(*) AS cnt
+        FROM insider_buy_signals
+        WHERE filing_date BETWEEN :start_date AND :end_date
+          AND transaction_date BETWEEN :min_transaction_date AND :end_date
+          AND (ticker IS NULL OR ticker = '' OR ticker IN ('NONE', 'none', 'N/A', 'n/a', 'NA', 'na'))
+    """
+    excluded_count = pd.read_sql_query(text(invalid_ticker_sql), engine, params=base_params).iloc[0, 0]
+    if excluded_count > 0:
+        log.info(
+            "invalid_ticker_transactions_excluded",
+            excluded_count=int(excluded_count),
+            patterns=["NULL", "", "NONE", "none", "N/A", "n/a", "NA", "na"],
+        )
+
     if base_df.empty:
+        log.warning(
+            "no_valid_transactions_found",
+            start_date=str(start_date),
+            end_date=str(end_date),
+            note="All transactions may have been excluded by ticker filters (NULL, empty, NONE, N/A)",
+        )
         return pd.DataFrame(columns=df.columns)
 
     base_df["transaction_date"] = pd.to_datetime(base_df["transaction_date"], errors="coerce")
@@ -801,7 +826,8 @@ def find_tradeable_cluster_signals(
         WHERE filing_date BETWEEN :start_date AND :end_date
           AND transaction_date BETWEEN :min_transaction_date AND :end_date
           AND ticker IS NOT NULL
-          AND ticker <> 'NONE'
+          AND ticker <> ''
+          AND ticker NOT IN ('NONE', 'none', 'N/A', 'n/a', 'NA', 'na')
           {value_filter}
           {exclusions_clause}
         {ticker_filter}
@@ -818,6 +844,12 @@ def find_tradeable_cluster_signals(
 
     base_df = pd.read_sql_query(text(base_sql), engine, params=params)
     if base_df.empty:
+        log.warning(
+            "no_valid_transactions_found",
+            start_date=str(start_filing_date),
+            end_date=str(end_filing_date),
+            note="All transactions may have been excluded by ticker filters (NULL, empty, NONE, N/A)",
+        )
         return pd.DataFrame()
 
     # Guardrail: Form 4 feeds occasionally contain malformed transaction dates (e.g., year "0024"),
