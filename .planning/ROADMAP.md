@@ -120,7 +120,7 @@ Plans:
 **Plans**: 1 plan
 
 Plans:
-- [ ] 10-01-PLAN.md -- Fix window merge span validation and add regression tests
+- [x] 10-01-PLAN.md -- Fix window merge span validation and add regression tests
 
 #### Phase 11: Issuer CIK Population
 **Goal**: Populate issuer_cik field in scan output
@@ -195,7 +195,7 @@ Phases execute in numeric order: 8 → 9 → 10 → 11 → 12 → 13 → 14
 | 7. Value Filter Enforcement | v1.0 | 2/2 | Complete | 2026-02-11 |
 | 8. Fund Ratio Filtering | v1.1 | 1/1 | Complete | 2026-02-11 |
 | 9. N/A Ticker Exclusion | v1.1 | 1/1 | Complete | 2026-02-11 |
-| 10. Window Span Validation | v1.1 | 0/1 | Not started | - |
+| 10. Window Span Validation | v1.1 | 1/1 | Complete | 2026-02-11 |
 | 11. Issuer CIK Population | v1.1 | 0/1 | Not started | - |
 | 12. Sale-to-Purchase Debug | v1.1 | 0/1 | Not started | - |
 | 13. Duplicate Ticker Handling | v1.1 | 0/1 | Not started | - |
