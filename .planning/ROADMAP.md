@@ -146,10 +146,10 @@ Plans:
   3. Root cause of 0.0 value is identified and documented
   4. Test coverage validates ratio calculation logic
   5. User can verify ratio correctness against raw transaction data
-**Plans**: TBD
+**Plans**: 1 plan
 
 Plans:
-- [ ] 12-01: TBD
+- [ ] 12-01-PLAN.md -- Create insider_trade_signals view, wire P+S data into ratio calculation, add tests
 
 #### Phase 13: Duplicate Ticker Handling
 **Goal**: Implement explicit strategy for same ticker appearing multiple times
