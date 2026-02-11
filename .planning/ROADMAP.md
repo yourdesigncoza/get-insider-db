@@ -131,10 +131,10 @@ Plans:
   2. CIK values match the SEC issuer identifier from form345_submission table
   3. Join logic between cluster detection and CIK lookup is correct
   4. Test coverage validates CIK population in cluster output
-**Plans**: TBD
+**Plans**: 1 plan
 
 Plans:
-- [ ] 11-01: TBD
+- [ ] 11-01-PLAN.md -- Add issuer_cik to insider_buy_signals view, apply migration, add regression tests
 
 #### Phase 12: Sale-to-Purchase Ratio Debug
 **Goal**: Fix avg_sale_to_purchase_ratio always being 0.0
@@ -196,7 +196,7 @@ Phases execute in numeric order: 8 → 9 → 10 → 11 → 12 → 13 → 14
 | 8. Fund Ratio Filtering | v1.1 | 1/1 | Complete | 2026-02-11 |
 | 9. N/A Ticker Exclusion | v1.1 | 1/1 | Complete | 2026-02-11 |
 | 10. Window Span Validation | v1.1 | 1/1 | Complete | 2026-02-11 |
-| 11. Issuer CIK Population | v1.1 | 0/1 | Not started | - |
+| 11. Issuer CIK Population | v1.1 | 0/1 | Planned | - |
 | 12. Sale-to-Purchase Debug | v1.1 | 0/1 | Not started | - |
 | 13. Duplicate Ticker Handling | v1.1 | 0/1 | Not started | - |
 | 14. Float Rounding | v1.1 | 0/1 | Not started | - |
