@@ -230,6 +230,53 @@ def _get_engine() -> Engine:
         raise DataAccessError(f"Failed to create engine: {exc}", {"url": DATABASE_URL[:30]}) from exc
 
 
+def _load_trades_for_ratio(
+    engine: Engine,
+    ticker_values: list[str],
+    start_date: date,
+    end_date: date,
+) -> pd.DataFrame:
+    """
+    Load purchase AND sale transactions for sale-to-purchase ratio calculation.
+    Uses insider_trade_signals view (P + S) instead of insider_buy_signals (P only).
+    Returns empty DataFrame if view does not exist (graceful fallback).
+    """
+    try:
+        cols = {col["name"] for col in inspect(engine).get_columns("insider_trade_signals")}
+    except SQLAlchemyError:
+        logger.debug("insider_trade_signals_view_not_found", note="ratio will use purchase-only data")
+        return pd.DataFrame()
+
+    sql = """
+        SELECT
+            ticker,
+            transaction_date,
+            filing_date,
+            insider_name,
+            transaction_code,
+            shares
+        FROM insider_trade_signals
+        WHERE filing_date BETWEEN :start_date AND :end_date
+          AND ticker = ANY(:tickers)
+          AND ticker IS NOT NULL
+          AND ticker <> ''
+    """
+    df = pd.read_sql_query(
+        text(sql), engine,
+        params={"start_date": start_date, "end_date": end_date, "tickers": ticker_values},
+    )
+    if df.empty:
+        return df
+
+    df["transaction_date"] = pd.to_datetime(df["transaction_date"], errors="coerce")
+    df["filing_date"] = pd.to_datetime(df["filing_date"], errors="coerce")
+    df = df[df["transaction_date"].notna() & df["filing_date"].notna()].copy()
+    df["shares"] = pd.to_numeric(df["shares"], errors="coerce").fillna(0.0)
+    df["insider_name"] = df["insider_name"].fillna("").astype(str)
+    df["normalized_name"] = df["insider_name"].map(normalize_insider_name)
+    return df
+
+
 def get_latest_filing_date() -> date:
     engine = _get_engine()
     with engine.connect() as conn:
@@ -560,6 +607,10 @@ def find_cluster_buys(
         base_df["is_fund_like"] = False
         base_df["entity_type"] = ""
 
+    # Load sales data for ratio calculation (all tickers at once)
+    all_tickers = df["ticker"].unique().tolist()
+    trades_for_ratio = _load_trades_for_ratio(engine, all_tickers, start_date, end_date)
+
     merged_records = []
     for ticker_value, tdf in df.groupby("ticker"):
         intervals = sorted(zip(tdf["window_start"], tdf["window_end"]), key=lambda x: x[0])
@@ -601,17 +652,25 @@ def find_cluster_buys(
 
             # Calculate sale_to_purchase_ratio using only temporally-available data
             # Filter to filings known at signal_filing_date to avoid look-ahead bias
-            temporally_safe_df = ticker_rows[
-                ticker_rows["filing_date"].dt.date <= signal_filing_date
-            ]
-            temporally_safe_df = calculate_sale_to_purchase_ratio(
-                temporally_safe_df.copy(),
-                lookback_days=lookback_days
-            )
-            # Get the ratio values for insiders in this subset
-            ratio_lookup = temporally_safe_df.set_index(
-                ["normalized_name", "transaction_date"]
-            )["sale_to_purchase_ratio"].to_dict()
+            ratio_ticker_rows = trades_for_ratio[trades_for_ratio["ticker"] == ticker_value] if not trades_for_ratio.empty else pd.DataFrame()
+            if ratio_ticker_rows.empty:
+                # Fallback: use purchase-only data from ticker_rows
+                ratio_input = ticker_rows[ticker_rows["filing_date"].dt.date <= signal_filing_date].copy()
+            else:
+                # Use P+S data from trades_for_ratio
+                ratio_input = ratio_ticker_rows[ratio_ticker_rows["filing_date"].dt.date <= signal_filing_date].copy()
+
+            if not ratio_input.empty:
+                ratio_input = calculate_sale_to_purchase_ratio(
+                    ratio_input,
+                    lookback_days=lookback_days
+                )
+                # Get the ratio values for insiders in this subset
+                ratio_lookup = ratio_input.set_index(
+                    ["normalized_name", "transaction_date"]
+                )["sale_to_purchase_ratio"].to_dict()
+            else:
+                ratio_lookup = {}
             subset = subset.copy()
             subset["sale_to_purchase_ratio"] = subset.apply(
                 lambda r: ratio_lookup.get(
@@ -925,6 +984,10 @@ def find_tradeable_cluster_signals(
         base_df["is_fund_like"] = False
         base_df["entity_type"] = ""
 
+    # Load sales data for ratio calculation (all tickers at once)
+    all_tickers = base_df["ticker"].unique().tolist()
+    trades_for_ratio = _load_trades_for_ratio(engine, all_tickers, start_filing_date, end_filing_date)
+
     records: list[dict[str, Any]] = []
     last_signal_by_ticker: Dict[str, date] = {}
 
@@ -938,10 +1001,33 @@ def find_tradeable_cluster_signals(
             revealed_df = ticker_df[ticker_df["filing_date"].dt.date <= filing_date_ts]
             # Calculate sale_to_purchase_ratio using only temporally-available data
             # This prevents look-ahead bias by using only filings known at this point
-            revealed_df = calculate_sale_to_purchase_ratio(
-                revealed_df.copy(),
-                lookback_days=lookback_days_for_features
-            )
+            ratio_ticker_rows = trades_for_ratio[trades_for_ratio["ticker"] == ticker_value] if not trades_for_ratio.empty else pd.DataFrame()
+            if ratio_ticker_rows.empty:
+                # Fallback: use purchase-only data from revealed_df
+                ratio_input = revealed_df.copy()
+            else:
+                # Use P+S data from trades_for_ratio
+                ratio_input = ratio_ticker_rows[ratio_ticker_rows["filing_date"].dt.date <= filing_date_ts].copy()
+
+            if not ratio_input.empty:
+                ratio_input = calculate_sale_to_purchase_ratio(
+                    ratio_input,
+                    lookback_days=lookback_days_for_features
+                )
+                # Merge ratio back to revealed_df
+                ratio_lookup = ratio_input.set_index(
+                    ["normalized_name", "transaction_date"]
+                )["sale_to_purchase_ratio"].to_dict()
+                revealed_df = revealed_df.copy()
+                revealed_df["sale_to_purchase_ratio"] = revealed_df.apply(
+                    lambda r: ratio_lookup.get(
+                        (r["normalized_name"], r["transaction_date"]), 0.0
+                    ),
+                    axis=1
+                )
+            else:
+                revealed_df = revealed_df.copy()
+                revealed_df["sale_to_purchase_ratio"] = 0.0
             idx = best_qualifying_window_indices(
                 revealed_df,
                 window_interval_days=window_interval,
