@@ -268,6 +268,7 @@ CREATE VIEW public.insider_buy_signals AS
     (s."PERIOD_OF_REPORT")::date AS period_of_report,
     s."ISSUERTRADINGSYMBOL" AS ticker,
     s."ISSUERNAME" AS issuer_name,
+    s."ISSUERCIK" AS issuer_cik,
     r."RPTOWNERCIK" AS insider_cik,
     r."RPTOWNERNAME" AS insider_name,
     r."RPTOWNER_TITLE" AS insider_title,
