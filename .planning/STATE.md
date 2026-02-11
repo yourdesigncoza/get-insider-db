@@ -3,12 +3,12 @@
 ## Current Position
 
 **Milestone:** v1.1 Result Quality 01
-**Phase:** Phase 9 (N/A Ticker Exclusion)
+**Phase:** Phase 10 (Window Span Validation)
 **Plan:** 1 of 1
 **Status:** Phase complete
-**Last activity:** 2026-02-11 — Completed 09-01-PLAN.md
+**Last activity:** 2026-02-11 — Completed 10-01-PLAN.md
 
-**Progress:** v1.1: ██░░░░░░░░ 29% (2/7 phases complete)
+**Progress:** v1.1: ███░░░░░░░ 43% (3/7 phases complete)
 
 ## Phase Status
 
@@ -23,13 +23,13 @@
 | 07 | Value Filter Enforcement | 2 | Complete (verified) |
 | 08 | Fund Ratio Filtering | 1 | Complete (verified) |
 | 09 | N/A Ticker Exclusion | 1 | Complete (verified) |
-| 10 | Window Span Validation | 0 | Not started |
+| 10 | Window Span Validation | 1 | Complete (verified) |
 | 11 | Issuer CIK Population | 0 | Not started |
 | 12 | Sale-to-Purchase Ratio Debug | 0 | Not started |
 | 13 | Duplicate Ticker Handling | 0 | Not started |
 | 14 | Float Rounding | 0 | Not started |
 
-**Total:** 23 plans across 14 phases (22 complete in v1.0, 2 complete in v1.1)
+**Total:** 23 plans across 14 phases (22 complete in v1.0, 3 complete in v1.1)
 
 ## Decisions Made
 
@@ -114,6 +114,7 @@
 | 08-01 | Zero total_insiders guard | Clusters with 0 total insiders excluded as data integrity check |
 | 08-01 | Silent filtering | No log lines for excluded clusters to avoid log noise |
 | 08-01 | Config-driven fund_ratio default | CLI --max-fund-ratio defaults to 0.25 from CLUSTER_THRESHOLDS |
+| 10-01 | Keep both overlapping windows when span violation | Preserves all signals, defers ticker deduplication to Phase 13 |
 
 ## Blockers
 
@@ -121,9 +122,9 @@ None
 
 ## Session Continuity
 
-**Last session:** 2026-02-11 16:50 UTC
-**Stopped at:** Completed plan 09-01
-**Resume file:** .planning/phases/09-n-a-ticker-exclusion/09-01-SUMMARY.md
+**Last session:** 2026-02-11 17:10 UTC
+**Stopped at:** Completed plan 10-01
+**Resume file:** .planning/phases/10-window-span-validation/10-01-SUMMARY.md
 
 ## Notes
 
@@ -132,3 +133,4 @@ v1.1 milestone started: 2026-02-11 (roadmap phase)
 Roadmap created: 2026-02-11 for phases 08-14
 Phase 08 (Fund Ratio Filtering) complete: 2026-02-11 (1 plan)
 Phase 09 (N/A Ticker Exclusion) complete: 2026-02-11 (1 plan)
+Phase 10 (Window Span Validation) complete: 2026-02-11 (1 plan)
