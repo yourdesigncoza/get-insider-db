@@ -569,8 +569,14 @@ def find_cluster_buys(
                 merged_intervals.append((start, end))
                 continue
             last_start, last_end = merged_intervals[-1]
-            if start <= last_end:  # overlap condition
-                merged_intervals[-1] = (last_start, max(last_end, end))
+            if start <= last_end:  # overlap detected
+                proposed_end = max(last_end, end)
+                if (proposed_end - last_start).days <= window_interval:
+                    merged_intervals[-1] = (last_start, proposed_end)
+                else:
+                    # Overlap exists but merged span would exceed window_days;
+                    # keep as separate cluster event to honor span constraint.
+                    merged_intervals.append((start, end))
             else:
                 merged_intervals.append((start, end))
 
