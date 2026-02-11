@@ -174,10 +174,10 @@ Plans:
   2. Rounding applies to avg_days_to_file, fund_ratio, avg_percent_change, cluster_score
   3. Rounding does not affect internal calculations (only final output)
   4. Export JSON is more readable and consistent
-**Plans**: TBD
+**Plans**: 1 plan
 
 Plans:
-- [ ] 14-01: TBD
+- [ ] 14-01-PLAN.md -- Extend rounding to all 5 float fields, add unit tests
 
 ## Progress
 
