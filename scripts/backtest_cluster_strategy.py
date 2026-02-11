@@ -205,7 +205,7 @@ def main() -> None:
     p.add_argument("--min-role-score", type=int, default=None)
     p.add_argument("--min-people", type=int, default=None)
     p.add_argument("--min-cluster-score", type=float, default=None)
-    p.add_argument("--max-fund-ratio", type=float, default=None)
+    p.add_argument("--max-fund-ratio", type=float, default=CLUSTER_THRESHOLDS.max_fund_ratio)
     p.add_argument("--cooldown-days", type=int, default=0)
     p.add_argument("--ticker", type=str, default=None)
     p.add_argument("--no-exclusions", action="store_true")

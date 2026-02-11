@@ -221,8 +221,8 @@ def main() -> None:
     parser.add_argument(
         "--max-fund-ratio",
         type=float,
-        default=None,
-        help="Maximum Funds/All ratio (e.g., 0.5 keeps clusters with <=50% funds)",
+        default=CLUSTER_THRESHOLDS.max_fund_ratio,
+        help="Maximum fund ratio (default: from config)",
     )
     parser.add_argument(
         "--min-cluster-score",
