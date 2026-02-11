@@ -1,6 +1,6 @@
 # Insider Cluster Buys DB (`get-insider-db`)
 
-Pipeline for ingesting SEC Form 3/4/5 data, classifying insiders, detecting conviction-weighted **cluster buy** events, and exporting runs that can be enriched with price performance.
+When multiple corporate insiders buy their own company's stock within the same short window, it often signals genuine conviction about the company's prospects. This pipeline detects those **cluster buy** events from SEC Form 3/4/5 filings, scores them by conviction strength, and tracks forward price performance.
 
 ## Project Overview
 - Loads raw SEC Form 345 TSVs into a relational database, normalizes transactions, and caches insider classifications.
@@ -20,12 +20,23 @@ Pipeline for ingesting SEC Form 3/4/5 data, classifying insiders, detecting conv
 - Sliding-window cluster buy detection with configurable insider counts, dollar thresholds, and fund exclusions.
 - Composite conviction scoring that blends role density, participation, ticket size, filing timeliness, and historical buy/sell behavior.
 - Alpha Vantage integration to append price at window end, forward returns (1/2/3m), and max drawdown.
-- Export scripts that persist top-ranked clusters to JSON for downstream analysis or dashboards.
+- Scan scripts that detect and persist top-ranked clusters to JSON for downstream analysis or dashboards.
 
 ## Analytics Logic
 - **Cluster identification:** Groups open-market `P` transactions by ticker within a rolling 10-day window (configurable) and flags a cluster when the third unique insider appears. Windows carry `signal_date`, `window_start/window_end`, and expire after a configurable horizon.
 - **Conviction scoring:** `compute_cluster_score` blends role score, people count, log-scaled total value, fund ratio penalty, average percent holdings increase, filing speed (`days_to_file`), and sale-to-purchase ratio. Role weights come from `insider_roles.py`; classification pulls from `insider_entities` and `insider_exclusions`.
 - **Feature engineering:** `feature_engineering.py` adds `days_to_file` and `sale_to_purchase_ratio`; cluster detection tracks ownership deltas to reward insiders increasing stake materially.
+
+## Typical Workflow
+
+```
+Load SEC data → Scan for clusters → Enrich with prices → Backtest
+```
+
+1. **Load** quarterly SEC Form 345 TSVs into the database
+2. **Scan** for cluster buy events — detects, scores, and writes JSON
+3. **Enrich** the JSON with forward price data (returns, drawdowns) via Alpha Vantage
+4. **Backtest** cluster signals across a date range to evaluate strategy performance
 
 ## Setup & Usage
 1. **Install requirements**
@@ -43,27 +54,84 @@ Pipeline for ingesting SEC Form 3/4/5 data, classifying insiders, detecting conv
    psql $DATABASE_URL -f schema.sql
    ```
 4. **Load quarterly SEC data**
-   - Place extracted quarters (e.g., `2025q3_form345/SUBMISSION.tsv`, `REPORTINGOWNER.tsv`, etc.) under `data/extracted/`.
+   - Download bulk Form 345 TSVs from [SEC EDGAR Full-Text Search](https://efts.sec.gov/LATEST/search-index?q=%22form345%22&dateRange=custom) or the [EDGAR bulk archives](https://www.sec.gov/data-research/sec-markets-data/insider-transactions-data-sets).
+   - Extract into `data/extracted/` with the naming convention `<year>q<quarter>_form345/` (e.g., `2025q3_form345/`). Each folder should contain `SUBMISSION.tsv`, `REPORTINGOWNER.tsv`, `NONDERIV_TRANS.tsv`, etc.
    - Ingest:
      ```bash
      python scripts/load_form345_quarter.py
      ```
 5. **Run cluster analysis**
-   - Inspect clusters in the console:
-     ```bash
-     python scripts/show_cluster_buys.py \
-       --window-days 10 --lookback-days 120 \
-       --min-insiders 3 --min-role-score 15 \
-       --min-cluster-score 60 --max-fund-ratio 0.25
-     ```
-   - Export the run to disk:
-     ```bash
-     python scripts/export_top_clusters.py --limit 50
-     ```
+
+   **5a. Scan clusters (JSON)**
+   Scan for cluster events and output to JSON for downstream analysis or enrichment. Add `--print` to also display a formatted table in the console.
+   ```bash
+   python scripts/scan_clusters.py \
+     --limit 50 --min-total-value 500000 --min-trade-value 50000 \
+     --output-dir exports/cluster_runs --basename my_run --print
+   ```
+   Key flags: `--limit` (20), `--min-insiders` (2), `--min-total-value` (500K, config-driven), `--min-trade-value` (50K, config-driven), `--output-dir` (`exports/cluster_runs`), `--basename` (auto-generated slug from filter params when omitted), `--print` (console table).
+
+   Sample JSON row:
+   ```json
+   {
+     "ticker": "BLNE",
+     "issuer_name": "Beeline Holdings, Inc.",
+     "window_start": "2025-08-25",
+     "window_end": "2025-09-03",
+     "signal_filing_date": "2025-09-04",
+     "entry_date": "2025-09-05",
+     "num_insiders": 2,
+     "total_value": 48765.53,
+     "role_score": 5,
+     "key_roles": "CFO",
+     "cluster_score": 100.0,
+     "avg_percent_change": 556.39,
+     "avg_days_to_file": 0.83,
+     "avg_sale_to_purchase_ratio": 0.0,
+     "top_insiders": "Moe Christopher R. (CFO), Milton Tiffany (CAO)"
+   }
+   ```
+
+   **5b. Backtest strategy**
+   Backtest tradeable cluster signals over a date range using cached market prices.
+   ```bash
+   python scripts/backtest_cluster_strategy.py \
+     --start-filing-date 2024-01-01 --end-filing-date 2025-01-01 \
+     --min-total-value 500000 --min-trade-value 50000 \
+     --horizons 30,60,90 --entry-delay-days 0,1,2 \
+     --out-csv results.csv
+   ```
+   Required: `--start-filing-date`, `--end-filing-date`. Key optional flags: `--horizons` (`30,60,90`), `--entry-delay-days` (`0`), `--min-insiders` (3), `--min-total-value` (500K, config-driven), `--min-trade-value` (50K, config-driven), `--out-csv`, `--cooldown-days` (0).
 6. **Enrich with Alpha Vantage prices**
    ```bash
    python scripts/enrich_clusters_with_price.py exports/cluster_runs/<export>.json
    ```
+
+## Interpreting Results
+
+| Column | What it means |
+|--------|---------------|
+| `cluster_score` | Composite conviction score (0-100). **60+** = high conviction, worth investigating. |
+| `role_score` | Sum of role weights across insiders. CFO/GC = 4, VP/COO = 3, CEO = 2, Director = 1. Higher = more senior buyers. |
+| `avg_percent_change` | Average % increase in each insider's holdings. Large increases (e.g., 100%+) suggest real commitment, not token buys. |
+| `avg_days_to_file` | Average days between transaction and SEC filing. Lower = faster filing = more confidence. |
+| `avg_sale_to_purchase_ratio` | Historical sell-vs-buy ratio for these insiders. 0.0 = pure buyers (best). High values = insiders who frequently sell. |
+| `num_insiders` / `num_fund_like` | People count vs fund-like entities. Clusters dominated by funds (`max_fund_ratio` > 0.25) are filtered by default. |
+| `entry_date` | First tradeable date after the signal becomes public (filing date + 1 business day). |
+
+## Tuning Parameters
+
+All weights and thresholds live in `src/scoring_config/scoring_weights.py` — the single source of truth.
+
+**Key levers:**
+- `ClusterThresholds.window_days` (default 10) — wider windows catch more clusters but dilute timing signal
+- `ClusterThresholds.min_unique_insiders` (default 3) — raise to filter for stronger consensus
+- `ClusterThresholds.min_total_value_usd` (default 500K) — dollar floor to exclude trivial buys
+- `ClusterThresholds.max_fund_ratio` (default 0.25) — cap fund-like entity participation
+- `ClusterScoringWeights.w_percent_change` (default 5.0) — highest-weighted factor; rewards large stake increases
+- `ClusterScoringWeights.saturation_k` (default 65) — controls how quickly scores approach 100
+
+CLI flags (`--min-cluster-score`, `--max-fund-ratio`, etc.) override config defaults per run without editing the file.
 
 ## Project Structure
 - `src/` — core library (config, classification, role weighting, cluster scoring).
