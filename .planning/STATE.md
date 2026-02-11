@@ -3,12 +3,12 @@
 ## Current Position
 
 **Milestone:** v1.1 Result Quality 01
-**Phase:** Phase 10 (Window Span Validation)
+**Phase:** Phase 11 (Issuer CIK Population)
 **Plan:** 1 of 1
 **Status:** Phase complete
-**Last activity:** 2026-02-11 — Completed 10-01-PLAN.md
+**Last activity:** 2026-02-11 — Completed 11-01-PLAN.md
 
-**Progress:** v1.1: ███░░░░░░░ 43% (3/7 phases complete)
+**Progress:** v1.1: ████░░░░░░ 57% (4/7 phases complete)
 
 ## Phase Status
 
@@ -24,12 +24,12 @@
 | 08 | Fund Ratio Filtering | 1 | Complete (verified) |
 | 09 | N/A Ticker Exclusion | 1 | Complete (verified) |
 | 10 | Window Span Validation | 1 | Complete (verified) |
-| 11 | Issuer CIK Population | 0 | Not started |
+| 11 | Issuer CIK Population | 1 | Complete (verified) |
 | 12 | Sale-to-Purchase Ratio Debug | 0 | Not started |
 | 13 | Duplicate Ticker Handling | 0 | Not started |
 | 14 | Float Rounding | 0 | Not started |
 
-**Total:** 23 plans across 14 phases (22 complete in v1.0, 3 complete in v1.1)
+**Total:** 24 plans across 14 phases (22 complete in v1.0, 4 complete in v1.1)
 
 ## Decisions Made
 
@@ -115,6 +115,10 @@
 | 08-01 | Silent filtering | No log lines for excluded clusters to avoid log noise |
 | 08-01 | Config-driven fund_ratio default | CLI --max-fund-ratio defaults to 0.25 from CLUSTER_THRESHOLDS |
 | 10-01 | Keep both overlapping windows when span violation | Preserves all signals, defers ticker deduplication to Phase 13 |
+| 11-01 | Use s."ISSUERCIK" AS issuer_cik in view | Match PostgreSQL case sensitivity for source column |
+| 11-01 | Place issuer_cik between issuer_name and insider_cik | Logical field grouping (issuer fields together) |
+| 11-01 | Zero Python code changes | Existing _get_optional_column handles new column automatically |
+| 11-01 | Apply migration inline (no separate file) | schema.sql is canonical DDL per project pattern |
 
 ## Blockers
 
@@ -122,9 +126,9 @@ None
 
 ## Session Continuity
 
-**Last session:** 2026-02-11 17:10 UTC
-**Stopped at:** Completed plan 10-01
-**Resume file:** .planning/phases/10-window-span-validation/10-01-SUMMARY.md
+**Last session:** 2026-02-11 17:37 UTC
+**Stopped at:** Completed plan 11-01
+**Resume file:** .planning/phases/11-issuer-cik-population/11-01-SUMMARY.md
 
 ## Notes
 
@@ -134,3 +138,4 @@ Roadmap created: 2026-02-11 for phases 08-14
 Phase 08 (Fund Ratio Filtering) complete: 2026-02-11 (1 plan)
 Phase 09 (N/A Ticker Exclusion) complete: 2026-02-11 (1 plan)
 Phase 10 (Window Span Validation) complete: 2026-02-11 (1 plan)
+Phase 11 (Issuer CIK Population) complete: 2026-02-11 (1 plan)
