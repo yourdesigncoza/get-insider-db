@@ -149,7 +149,7 @@ Plans:
 **Plans**: 1 plan
 
 Plans:
-- [ ] 12-01-PLAN.md -- Create insider_trade_signals view, wire P+S data into ratio calculation, add tests
+- [x] 12-01-PLAN.md -- Create insider_trade_signals view, wire P+S data into ratio calculation, add tests
 
 #### Phase 13: Duplicate Ticker Handling
 **Goal**: Implement explicit strategy for same ticker appearing multiple times
@@ -197,7 +197,7 @@ Phases execute in numeric order: 8 → 9 → 10 → 11 → 12 → 13 → 14
 | 9. N/A Ticker Exclusion | v1.1 | 1/1 | Complete | 2026-02-11 |
 | 10. Window Span Validation | v1.1 | 1/1 | Complete | 2026-02-11 |
 | 11. Issuer CIK Population | v1.1 | 1/1 | Complete | 2026-02-11 |
-| 12. Sale-to-Purchase Debug | v1.1 | 0/1 | Not started | - |
+| 12. Sale-to-Purchase Debug | v1.1 | 1/1 | Complete | 2026-02-11 |
 | 13. Duplicate Ticker Handling | v1.1 | 0/1 | Not started | - |
 | 14. Float Rounding | v1.1 | 0/1 | Not started | - |
 
