@@ -4,11 +4,11 @@
 
 **Milestone:** v1.0 shipped — planning next milestone
 **Phase:** 07 of 7 (Value Filter Enforcement)
-**Plan:** 1 of 2
-**Status:** In progress
-**Last activity:** 2026-02-11 - Completed 07-01-PLAN.md
+**Plan:** 2 of 2
+**Status:** Complete
+**Last activity:** 2026-02-11 - Completed 07-02-PLAN.md
 
-**Progress:** ✓ v1.0 complete (6 phases, 20 plans) | Phase 07: █░ (1/2 plans)
+**Progress:** ✓ v1.0 complete (6 phases, 20 plans) | Phase 07: ██ (2/2 plans)
 
 ## Phase Status
 
@@ -20,9 +20,9 @@
 | 04 | Feature Completeness & Debt Cleanup | 4 | 1 | Complete (verified) |
 | 05 | Async Enricher Parity | 2 | 1 | Complete (verified) |
 | 06 | Production Integration Cleanup | 3 | 1 | ✓ Complete (verified) |
-| 07 | Value Filter Enforcement | 2 | 1 | In progress (1/2 plans) |
+| 07 | Value Filter Enforcement | 2 | 1 | ✓ Complete (verified) |
 
-**Total:** 22 plans across 7 phases (20 complete, 2 in phase 07)
+**Total:** 22 plans across 7 phases (22 complete)
 
 ## Decisions Made
 
@@ -100,6 +100,9 @@
 | 07-01 | Increased w_value from 2.0 to 3.0 | Amplifies dollar value impact in scoring formula |
 | 07-01 | Set min_trade_value_usd to 50_000.0 | Filters out small trades that don't signal meaningful conviction |
 | 07-01 | Wired config into function defaults | Eliminates disconnect where ClusterThresholds defined values but functions defaulted to 0.0 |
+| 07-02 | Import CLUSTER_THRESHOLDS into CLI scripts | Centralized default management for value filters across all 3 CLI scripts |
+| 07-02 | Config-driven CLI defaults | show/export/backtest scripts default to 500K total value and 50K trade value from config |
+| 07-02 | Preserve user override capability | Users can still pass explicit CLI flags to override config defaults |
 
 ## Blockers
 
@@ -269,14 +272,14 @@ None
 
 ## Phase 07 Verification Summary
 
-- **Score:** 1/2 plans complete (50%)
-- **Tests:** 17 core cluster detection tests passing
-- **Config wiring:** CLUSTER_THRESHOLDS now drives function defaults
-- **Next:** Plan 07-02 (enforcement verification)
+- **Score:** 2/2 plans complete (100%)
+- **Tests:** 14 core cluster detection tests passing
+- **Config wiring:** CLUSTER_THRESHOLDS drives function defaults AND CLI defaults
+- **Status:** Complete
 
 **Plans:**
-- **Plan 07-01:** ✓ Complete - Config wiring for value filters
-- **Plan 07-02:** Pending - Enforcement verification
+- **Plan 07-01:** ✓ Complete - Config wiring for value filters (functions)
+- **Plan 07-02:** ✓ Complete - Config wiring for value filters (CLI scripts)
 
 **Completed in 07-01:**
 - src/scoring_config/scoring_weights.py: w_value 2.0→3.0, min_trade_value_usd 0.0→50K
@@ -284,11 +287,17 @@ None
 - tests/test_cluster_scoring.py: Updated assertions for new scoring ranges (62-66)
 - Commits: a4fafe4, 7c90c76
 
+**Completed in 07-02:**
+- scripts/show_cluster_buys.py: CLUSTER_THRESHOLDS wired into --min-total-value and --min-trade-value
+- scripts/export_top_clusters.py: CLUSTER_THRESHOLDS wired into --min-total-value and --min-trade-value
+- scripts/backtest_cluster_strategy.py: CLUSTER_THRESHOLDS wired into --min-total-value and --min-trade-value
+- Commit: c3b9e91
+
 ## Session Continuity
 
-**Last session:** 2026-02-11 08:40:56 UTC
-**Stopped at:** Completed 07-01-PLAN.md (config wiring)
-**Resume file:** .planning/phases/07-value-filter-enforcement/07-02-PLAN.md
+**Last session:** 2026-02-11 08:48:48 UTC
+**Stopped at:** Completed 07-02-PLAN.md (CLI config wiring)
+**Resume file:** Phase 07 complete - all phases complete
 
 ## Notes
 
