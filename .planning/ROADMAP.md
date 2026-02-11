@@ -117,10 +117,10 @@ Plans:
   2. Root cause of window merging issue is identified and documented
   3. Sliding window algorithm is corrected if flawed
   4. Test coverage added to prevent regression (window span validation)
-**Plans**: TBD
+**Plans**: 1 plan
 
 Plans:
-- [ ] 10-01: TBD
+- [ ] 10-01-PLAN.md -- Fix window merge span validation and add regression tests
 
 #### Phase 11: Issuer CIK Population
 **Goal**: Populate issuer_cik field in scan output
