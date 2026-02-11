@@ -89,10 +89,10 @@ Plans:
   2. User can inspect and verify fund_ratio values in output before filtering
   3. Fund ratio threshold is configurable via CLI flag (with default from ClusterThresholds)
   4. Filtered clusters are logged with reason (fund_ratio > threshold)
-**Plans**: TBD
+**Plans**: 1 plan
 
 Plans:
-- [ ] 08-01: TBD
+- [ ] 08-01-PLAN.md -- Fix boundary operators, add fund_ratio to output, wire CLI defaults, add boundary tests
 
 #### Phase 9: N/A Ticker Exclusion
 **Goal**: Prevent non-tradeable tickers from appearing in results
@@ -193,7 +193,7 @@ Phases execute in numeric order: 8 → 9 → 10 → 11 → 12 → 13 → 14
 | 5. Async Enricher Parity | v1.0 | 2/2 | Complete | 2026-02-05 |
 | 6. Production Integration | v1.0 | 3/3 | Complete | 2026-02-05 |
 | 7. Value Filter Enforcement | v1.0 | 2/2 | Complete | 2026-02-11 |
-| 8. Fund Ratio Filtering | v1.1 | 0/1 | Not started | - |
+| 8. Fund Ratio Filtering | v1.1 | 0/1 | Planned | - |
 | 9. N/A Ticker Exclusion | v1.1 | 0/1 | Not started | - |
 | 10. Window Span Validation | v1.1 | 0/1 | Not started | - |
 | 11. Issuer CIK Population | v1.1 | 0/1 | Not started | - |
