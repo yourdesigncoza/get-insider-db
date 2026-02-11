@@ -177,7 +177,7 @@ Plans:
 **Plans**: 1 plan
 
 Plans:
-- [ ] 14-01-PLAN.md -- Extend rounding to all 5 float fields, add unit tests
+- [x] 14-01-PLAN.md -- Extend rounding to all 5 float fields, add unit tests
 
 ## Progress
 
@@ -199,7 +199,7 @@ Phases execute in numeric order: 8 → 9 → 10 → 11 → 12 → 13 → 14
 | 11. Issuer CIK Population | v1.1 | 1/1 | Complete | 2026-02-11 |
 | 12. Sale-to-Purchase Debug | v1.1 | 1/1 | Complete | 2026-02-11 |
 | 13. Duplicate Ticker Handling | v1.1 | 1/1 | Complete | 2026-02-11 |
-| 14. Float Rounding | v1.1 | 0/1 | Not started | - |
+| 14. Float Rounding | v1.1 | 1/1 | Complete | 2026-02-11 |
 
 ---
 *Roadmap created: 2026-02-11 for milestone v1.1*
