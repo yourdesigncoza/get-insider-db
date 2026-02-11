@@ -676,6 +676,7 @@ def find_cluster_buys(
                     "num_insiders": int(num_people),
                     "num_total_insiders": int(total_unique_insiders),
                     "num_fund_like": int(num_fund_like),
+                    "fund_ratio": float(num_fund_like / max(total_unique_insiders, 1)),
                     "total_shares": float(total_shares),
                     "total_value": float(total_value),
                     "top_insiders": top_insiders,
@@ -706,8 +707,11 @@ def find_cluster_buys(
     if min_cluster_score is not None:
         merged_df = merged_df[merged_df["cluster_score"] >= min_cluster_score]
     if max_fund_ratio is not None:
-        denom = merged_df["num_total_insiders"].replace(0, 1)
-        merged_df = merged_df[(merged_df["num_fund_like"] / denom) <= max_fund_ratio]
+        denom = merged_df["num_total_insiders"]
+        merged_df = merged_df[
+            (denom > 0) &
+            ((merged_df["num_fund_like"] / denom) < max_fund_ratio)
+        ]
 
     merged_df = merged_df.sort_values(
         by=["cluster_score", "role_score", "num_insiders", "total_value", "num_fund_like"],
@@ -1013,8 +1017,9 @@ def find_tradeable_cluster_signals(
             if min_cluster_score is not None and cluster_score < min_cluster_score:
                 continue
             if max_fund_ratio is not None:
-                denom = total_unique_insiders if total_unique_insiders else 1
-                if (num_fund_like / denom) > max_fund_ratio:
+                if total_unique_insiders == 0:
+                    continue
+                if (num_fund_like / total_unique_insiders) >= max_fund_ratio:
                     continue
 
             records.append(
@@ -1030,6 +1035,7 @@ def find_tradeable_cluster_signals(
                     "num_insiders": int(num_people),
                     "num_total_insiders": total_unique_insiders,
                     "num_fund_like": int(num_fund_like),
+                    "fund_ratio": float(num_fund_like / max(total_unique_insiders, 1)),
                     "total_shares": total_shares,
                     "total_value": total_value,
                     "top_insiders": ", ".join(people),
