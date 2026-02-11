@@ -306,6 +306,7 @@ def main() -> None:
             "max_fund_ratio": args.max_fund_ratio,
             "ticker": args.ticker,
             "use_exclusions": args.use_exclusions,
+            "excluded_ticker_patterns": ["NULL", "", "NONE", "N/A", "NA"],
             "limit": args.limit,
             "as_of_filing_date": args.as_of_filing_date,
         },
