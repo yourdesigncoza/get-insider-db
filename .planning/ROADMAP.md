@@ -160,10 +160,10 @@ Plans:
   2. Duplicate handling strategy is documented (merge, flag, or deduplicate)
   3. User can differentiate between independent cluster events vs overlapping activity
   4. CLI provides option to show all occurrences or deduplicate by highest score
-**Plans**: TBD
+**Plans**: 1 plan
 
 Plans:
-- [ ] 13-01: TBD
+- [ ] 13-01-PLAN.md -- Add --deduplicate CLI flag, duplicate annotation in console, dedup utility with tests
 
 #### Phase 14: Float Rounding
 **Goal**: Round numeric export fields to 2 decimal places
