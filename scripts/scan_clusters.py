@@ -34,6 +34,15 @@ from src.analytics.cluster_buys import get_top_cluster_buys
 from src.analytics.duplicate_handling import deduplicate_by_highest_score, annotate_duplicates
 from src.scoring_config.scoring_weights import CLUSTER_THRESHOLDS
 
+# Floating-point fields to round to 2 decimals for export readability (OUT-02)
+FLOAT_FIELDS_TO_ROUND = [
+    "cluster_score",
+    "avg_percent_change",
+    "avg_days_to_file",
+    "fund_ratio",
+    "avg_sale_to_purchase_ratio",
+]
+
 
 def format_rows(rows: List[Any]) -> None:
     """Print cluster rows as a Rich table, tabulate table, or plain text."""
@@ -329,7 +338,8 @@ def main() -> None:
         if col in out_df.columns:
             out_df = out_df.drop(columns=[col])
 
-    for col in ("cluster_score", "avg_percent_change"):
+    # Round all floating-point fields to 2 decimals for export readability (OUT-02)
+    for col in FLOAT_FIELDS_TO_ROUND:
         if col in out_df.columns:
             out_df[col] = out_df[col].round(2)
 
