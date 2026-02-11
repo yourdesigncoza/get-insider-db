@@ -4,11 +4,11 @@
 
 **Milestone:** v1.1 Result Quality 01
 **Phase:** Phase 8 (Fund Ratio Filtering)
-**Plan:** Ready to plan
-**Status:** Roadmap created
-**Last activity:** 2026-02-11 — Roadmap created for v1.1 milestone
+**Plan:** 1 of 1
+**Status:** Phase complete
+**Last activity:** 2026-02-11 — Completed 08-01-PLAN.md
 
-**Progress:** v1.1: ░░░░░░░░░░ 0%
+**Progress:** v1.1: █░░░░░░░░░ 14% (1/7 phases complete)
 
 ## Phase Status
 
@@ -21,7 +21,7 @@
 | 05 | Async Enricher Parity | 2 | Complete (verified) |
 | 06 | Production Integration Cleanup | 3 | Complete (verified) |
 | 07 | Value Filter Enforcement | 2 | Complete (verified) |
-| 08 | Fund Ratio Filtering | 0 | Not started |
+| 08 | Fund Ratio Filtering | 1 | Complete (verified) |
 | 09 | N/A Ticker Exclusion | 0 | Not started |
 | 10 | Window Span Validation | 0 | Not started |
 | 11 | Issuer CIK Population | 0 | Not started |
@@ -29,7 +29,7 @@
 | 13 | Duplicate Ticker Handling | 0 | Not started |
 | 14 | Float Rounding | 0 | Not started |
 
-**Total:** 22 plans across 14 phases (22 complete in v1.0)
+**Total:** 23 plans across 14 phases (22 complete in v1.0, 1 complete in v1.1)
 
 ## Decisions Made
 
@@ -110,6 +110,10 @@
 | 07-02 | Import CLUSTER_THRESHOLDS into CLI scripts | Centralized default management for value filters across all 3 CLI scripts |
 | 07-02 | Config-driven CLI defaults | show/export/backtest scripts default to 500K total value and 50K trade value from config |
 | 07-02 | Preserve user override capability | Users can still pass explicit CLI flags to override config defaults |
+| 08-01 | Strict exclusive boundary (< max_fund_ratio) | Clusters with fund_ratio >= max are excluded (not <=) |
+| 08-01 | Zero total_insiders guard | Clusters with 0 total insiders excluded as data integrity check |
+| 08-01 | Silent filtering | No log lines for excluded clusters to avoid log noise |
+| 08-01 | Config-driven fund_ratio default | CLI --max-fund-ratio defaults to 0.25 from CLUSTER_THRESHOLDS |
 
 ## Blockers
 
@@ -117,12 +121,13 @@ None
 
 ## Session Continuity
 
-**Last session:** 2026-02-11 09:00 UTC
-**Stopped at:** Roadmap created for v1.1 Result Quality 01
-**Resume file:** None - ready to plan Phase 08
+**Last session:** 2026-02-11 16:18 UTC
+**Stopped at:** Completed plan 08-01
+**Resume file:** .planning/phases/08-fund-ratio-filtering/08-01-SUMMARY.md
 
 ## Notes
 
 v1.0 milestone shipped: 2026-02-05 (22 plans across 7 phases)
 v1.1 milestone started: 2026-02-11 (roadmap phase)
 Roadmap created: 2026-02-11 for phases 08-14
+Phase 08 (Fund Ratio Filtering) complete: 2026-02-11 (1 plan)
