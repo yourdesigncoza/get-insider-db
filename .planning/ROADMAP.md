@@ -163,7 +163,7 @@ Plans:
 **Plans**: 1 plan
 
 Plans:
-- [ ] 13-01-PLAN.md -- Add --deduplicate CLI flag, duplicate annotation in console, dedup utility with tests
+- [x] 13-01-PLAN.md -- Add --deduplicate CLI flag, duplicate annotation in console, dedup utility with tests
 
 #### Phase 14: Float Rounding
 **Goal**: Round numeric export fields to 2 decimal places
@@ -198,7 +198,7 @@ Phases execute in numeric order: 8 → 9 → 10 → 11 → 12 → 13 → 14
 | 10. Window Span Validation | v1.1 | 1/1 | Complete | 2026-02-11 |
 | 11. Issuer CIK Population | v1.1 | 1/1 | Complete | 2026-02-11 |
 | 12. Sale-to-Purchase Debug | v1.1 | 1/1 | Complete | 2026-02-11 |
-| 13. Duplicate Ticker Handling | v1.1 | 0/1 | Not started | - |
+| 13. Duplicate Ticker Handling | v1.1 | 1/1 | Complete | 2026-02-11 |
 | 14. Float Rounding | v1.1 | 0/1 | Not started | - |
 
 ---
