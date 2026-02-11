@@ -4,7 +4,7 @@
 
 **Name:** get-insider-db
 **Type:** Data pipeline for SEC insider trading analysis
-**Status:** v1.0 shipped — production ready
+**Status:** v1.1 in progress — result quality improvements
 
 ## Purpose
 
@@ -42,7 +42,17 @@ Pipeline ingests SEC Form 3/4/5 data, classifies insiders, detects conviction-we
 
 ### Active
 
-(None — next milestone will define new requirements)
+#### v1.1 Result Quality 01
+
+**Goal:** Improve cluster scan output quality — fix false positives, exclude non-tradeable entities, debug broken features, and clean export formatting.
+
+- [ ] Fund-heavy clusters filtered by max_fund_ratio
+- [ ] N/A tickers excluded from results
+- [ ] Window span behavior investigated and corrected
+- [ ] issuer_cik populated in output
+- [ ] avg_sale_to_purchase_ratio feature debugged
+- [ ] Duplicate ticker handling strategy implemented
+- [ ] Numeric fields rounded to 2 decimal places
 
 ### Out of Scope
 
@@ -78,4 +88,4 @@ Pipeline ingests SEC Form 3/4/5 data, classifies insiders, detects conviction-we
 
 ---
 
-*Last updated: 2026-02-05 after v1.0 milestone*
+*Last updated: 2026-02-11 after v1.1 milestone start*
