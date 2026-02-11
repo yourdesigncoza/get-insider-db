@@ -31,6 +31,7 @@ except ImportError:
     Table = None
 
 from src.analytics.cluster_buys import get_top_cluster_buys
+from src.analytics.duplicate_handling import deduplicate_by_highest_score, annotate_duplicates
 from src.scoring_config.scoring_weights import CLUSTER_THRESHOLDS
 
 
@@ -46,14 +47,19 @@ def format_rows(rows: List[Any]) -> None:
     has_avg_percent_change = any("avg_percent_change" in row for row in rows)
     has_avg_days_to_file = any("avg_days_to_file" in row for row in rows)
     has_avg_sale_to_purchase_ratio = any("avg_sale_to_purchase_ratio" in row for row in rows)
+    has_duplicate_count = any("duplicate_count" in row for row in rows)
     if Console and Table:
         console = Console()
         table = Table(show_header=True, header_style="bold cyan", box=box.MARKDOWN)
         columns = [
             ("ticker", "Ticker", "left"),
+        ]
+        if has_duplicate_count:
+            columns.append(("duplicate_rank", "#", "right"))
+        columns.extend([
             ("window_start", "Start", "center"),
             ("window_end", "End", "center"),
-        ]
+        ])
         if has_signal_filing_date:
             columns.append(("signal_filing_date", "Filed", "center"))
         if has_entry_date:
@@ -84,10 +90,15 @@ def format_rows(rows: List[Any]) -> None:
         for _, title, justify in columns:
             table.add_column(title, justify=justify)
         for row in rows:
-            table.add_row(
-                str(row.get("ticker", "")),
+            base_values = [str(row.get("ticker", ""))]
+            if has_duplicate_count:
+                base_values.append(str(row.get("duplicate_rank", "")))
+            base_values.extend([
                 str(row.get("window_start", "")),
                 str(row.get("window_end", "")),
+            ])
+            table.add_row(
+                *base_values,
                 *([str(row.get("signal_filing_date", ""))] if has_signal_filing_date else []),
                 *([str(row.get("entry_date", ""))] if has_entry_date else []),
                 f"{int(row.get('num_insiders', 0)):,}",
@@ -253,6 +264,11 @@ def main() -> None:
         dest="print_table",
         help="Also print a formatted table to the console",
     )
+    parser.add_argument(
+        "--deduplicate",
+        action="store_true",
+        help="Keep only highest-scoring cluster per ticker (default: show all occurrences)",
+    )
     args = parser.parse_args()
     args.use_exclusions = not args.no_exclusions
 
@@ -260,8 +276,11 @@ def main() -> None:
     if args.as_of_filing_date:
         as_of_filing_date = datetime.strptime(args.as_of_filing_date, "%Y-%m-%d").date()
 
+    # If deduplicating, fetch more rows to ensure we get enough unique tickers
+    query_limit = args.limit * 5 if args.deduplicate else args.limit
+
     df = get_top_cluster_buys(
-        limit=args.limit,
+        limit=query_limit,
         window_days=args.window_days,
         lookback_days=args.lookback_days,
         min_insiders=args.min_insiders,
@@ -280,10 +299,36 @@ def main() -> None:
         print("No cluster buys found with the given filters.")
         return
 
+    # Track pre-processing counts
+    total_clusters = len(df)
+    unique_tickers = df['ticker'].nunique()
+
+    if args.deduplicate:
+        df = deduplicate_by_highest_score(df)
+        removed = total_clusters - len(df)
+        if removed > 0:
+            print(f"Deduplicated: {removed} duplicate clusters removed "
+                  f"({len(df)} unique tickers from {total_clusters} total)")
+        # Apply user-requested limit after dedup
+        df = df.head(args.limit)
+    else:
+        # Annotate duplicates for console display awareness
+        df = annotate_duplicates(df)
+        dup_tickers = len(df[df['duplicate_count'] > 1]['ticker'].unique()) if 'duplicate_count' in df.columns else 0
+        if dup_tickers > 0:
+            print(f"Note: {dup_tickers} tickers appear multiple times "
+                  f"(use --deduplicate to keep only highest-scoring per ticker)")
+
     if args.print_table:
         format_rows(df.to_dict(orient="records"))
 
     out_df = df.copy()
+
+    # Remove console-only annotation columns from JSON export
+    for col in ("duplicate_count", "duplicate_rank"):
+        if col in out_df.columns:
+            out_df = out_df.drop(columns=[col])
+
     for col in ("cluster_score", "avg_percent_change"):
         if col in out_df.columns:
             out_df[col] = out_df[col].round(2)
@@ -294,6 +339,8 @@ def main() -> None:
     metadata = {
         "generated_at": now.isoformat(),
         "row_count": len(out_df),
+        "deduplicated": args.deduplicate,
+        "unique_tickers": df['ticker'].nunique(),
         "filters": {
             "window_days": args.window_days,
             "lookback_days": args.lookback_days,
