@@ -103,10 +103,10 @@ Plans:
   2. Rows with NULL ticker values are excluded from scan_clusters.py output
   3. User sees log message indicating how many clusters were excluded due to invalid tickers
   4. Exclusion happens at SQL query level (not post-processing filter)
-**Plans**: TBD
+**Plans**: 1 plan
 
 Plans:
-- [ ] 09-01: TBD
+- [ ] 09-01-PLAN.md -- Add N/A/empty ticker exclusion to SQL queries, metadata documentation, and tests
 
 #### Phase 10: Window Span Validation
 **Goal**: Investigate and correct window merging behavior that creates spans exceeding window_days
