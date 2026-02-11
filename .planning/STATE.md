@@ -3,12 +3,12 @@
 ## Current Position
 
 **Milestone:** v1.1 Result Quality 01
-**Phase:** Phase 11 (Issuer CIK Population)
+**Phase:** Phase 12 (Sale-to-Purchase Ratio Debug)
 **Plan:** 1 of 1
 **Status:** Phase complete
-**Last activity:** 2026-02-11 — Completed 11-01-PLAN.md
+**Last activity:** 2026-02-11 — Completed 12-01-PLAN.md
 
-**Progress:** v1.1: ████░░░░░░ 57% (4/7 phases complete)
+**Progress:** v1.1: █████░░░░░ 71% (5/7 phases complete)
 
 ## Phase Status
 
@@ -25,11 +25,11 @@
 | 09 | N/A Ticker Exclusion | 1 | Complete (verified) |
 | 10 | Window Span Validation | 1 | Complete (verified) |
 | 11 | Issuer CIK Population | 1 | Complete (verified) |
-| 12 | Sale-to-Purchase Ratio Debug | 0 | Not started |
+| 12 | Sale-to-Purchase Ratio Debug | 1 | Complete (verified) |
 | 13 | Duplicate Ticker Handling | 0 | Not started |
 | 14 | Float Rounding | 0 | Not started |
 
-**Total:** 24 plans across 14 phases (22 complete in v1.0, 4 complete in v1.1)
+**Total:** 25 plans across 14 phases (22 complete in v1.0, 5 complete in v1.1)
 
 ## Decisions Made
 
@@ -119,6 +119,10 @@
 | 11-01 | Place issuer_cik between issuer_name and insider_cik | Logical field grouping (issuer fields together) |
 | 11-01 | Zero Python code changes | Existing _get_optional_column handles new column automatically |
 | 11-01 | Apply migration inline (no separate file) | schema.sql is canonical DDL per project pattern |
+| 12-01 | Keep insider_buy_signals unchanged (purchase-only) | Existing consumers rely on purchase-only data; don't break them |
+| 12-01 | Create separate insider_trade_signals view for ratio calculation | Different use cases need different data; separation of concerns |
+| 12-01 | Graceful fallback if view doesn't exist | Development/staging environments may not have new view yet |
+| 12-01 | Load sales data once per ticker batch | Avoid N+1 query pattern, improved performance |
 
 ## Blockers
 
@@ -126,9 +130,9 @@ None
 
 ## Session Continuity
 
-**Last session:** 2026-02-11 17:37 UTC
-**Stopped at:** Completed plan 11-01
-**Resume file:** .planning/phases/11-issuer-cik-population/11-01-SUMMARY.md
+**Last session:** 2026-02-11 18:06 UTC
+**Stopped at:** Completed plan 12-01
+**Resume file:** .planning/phases/12-sale-to-purchase-ratio-debug/12-01-SUMMARY.md
 
 ## Notes
 
@@ -139,3 +143,4 @@ Phase 08 (Fund Ratio Filtering) complete: 2026-02-11 (1 plan)
 Phase 09 (N/A Ticker Exclusion) complete: 2026-02-11 (1 plan)
 Phase 10 (Window Span Validation) complete: 2026-02-11 (1 plan)
 Phase 11 (Issuer CIK Population) complete: 2026-02-11 (1 plan)
+Phase 12 (Sale-to-Purchase Ratio Debug) complete: 2026-02-11 (1 plan)
