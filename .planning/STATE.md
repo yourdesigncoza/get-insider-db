@@ -3,12 +3,12 @@
 ## Current Position
 
 **Milestone:** v1.1 Result Quality 01
-**Phase:** Phase 12 (Sale-to-Purchase Ratio Debug)
+**Phase:** Phase 13 (Duplicate Ticker Handling)
 **Plan:** 1 of 1
 **Status:** Phase complete
-**Last activity:** 2026-02-11 — Completed 12-01-PLAN.md
+**Last activity:** 2026-02-11 — Completed 13-01-PLAN.md
 
-**Progress:** v1.1: █████░░░░░ 71% (5/7 phases complete)
+**Progress:** v1.1: ██████░░░░ 86% (6/7 phases complete)
 
 ## Phase Status
 
@@ -26,10 +26,10 @@
 | 10 | Window Span Validation | 1 | Complete (verified) |
 | 11 | Issuer CIK Population | 1 | Complete (verified) |
 | 12 | Sale-to-Purchase Ratio Debug | 1 | Complete (verified) |
-| 13 | Duplicate Ticker Handling | 0 | Not started |
+| 13 | Duplicate Ticker Handling | 1 | Complete (verified) |
 | 14 | Float Rounding | 0 | Not started |
 
-**Total:** 25 plans across 14 phases (22 complete in v1.0, 5 complete in v1.1)
+**Total:** 26 plans across 14 phases (22 complete in v1.0, 6 complete in v1.1)
 
 ## Decisions Made
 
@@ -123,6 +123,11 @@
 | 12-01 | Create separate insider_trade_signals view for ratio calculation | Different use cases need different data; separation of concerns |
 | 12-01 | Graceful fallback if view doesn't exist | Development/staging environments may not have new view yet |
 | 12-01 | Load sales data once per ticker batch | Avoid N+1 query pattern, improved performance |
+| 13-01 | Deduplication as display concern (not detection logic) | Research shows duplicates arise from independent sliding windows - both signals valid, but users need control over output presentation |
+| 13-01 | Pure functions with no side effects | Testable, composable, no database dependencies - follows functional programming best practices |
+| 13-01 | Annotation columns for console display only | JSON consumers don't need UI metadata - keeps export schema clean |
+| 13-01 | 5x query limit buffer for dedup mode | Research shows ~40% duplication rate - 5x provides safe margin to return requested number of unique tickers |
+| 13-01 | Tiebreaker sequence (cluster_score, total_value, window_end) | Prioritize highest conviction, then dollar magnitude, then recency for stable deterministic selection |
 
 ## Blockers
 
@@ -130,9 +135,9 @@ None
 
 ## Session Continuity
 
-**Last session:** 2026-02-11 18:06 UTC
-**Stopped at:** Completed plan 12-01
-**Resume file:** .planning/phases/12-sale-to-purchase-ratio-debug/12-01-SUMMARY.md
+**Last session:** 2026-02-11 18:33 UTC
+**Stopped at:** Completed plan 13-01
+**Resume file:** .planning/phases/13-duplicate-ticker-handling/13-01-SUMMARY.md
 
 ## Notes
 
@@ -144,3 +149,4 @@ Phase 09 (N/A Ticker Exclusion) complete: 2026-02-11 (1 plan)
 Phase 10 (Window Span Validation) complete: 2026-02-11 (1 plan)
 Phase 11 (Issuer CIK Population) complete: 2026-02-11 (1 plan)
 Phase 12 (Sale-to-Purchase Ratio Debug) complete: 2026-02-11 (1 plan)
+Phase 13 (Duplicate Ticker Handling) complete: 2026-02-11 (1 plan)
