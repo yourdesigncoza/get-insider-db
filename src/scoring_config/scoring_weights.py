@@ -88,7 +88,7 @@ class ClusterScoringWeights:
     # Positive weights
     w_role: float = 2.0          # Role-weighted insider quality
     w_people: float = 1.0        # Number of unique insiders
-    w_value: float = 2.0         # Log-scaled dollar value
+    w_value: float = 3.0         # Log-scaled dollar value
     w_percent_change: float = 5.0  # Average stake increase (high conviction signal)
 
     # Penalty weights (applied as negatives)
@@ -112,7 +112,7 @@ class ClusterThresholds:
     window_days: int = 10
     min_unique_insiders: int = 3
     min_total_value_usd: float = 500_000.0
-    min_trade_value_usd: float = 0.0
+    min_trade_value_usd: float = 50_000.0
 
     # Scoring filters
     min_cluster_score: float = 60.0

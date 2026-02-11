@@ -2,15 +2,11 @@ import pytest
 from src.cluster_scoring import compute_cluster_score
 
 def test_cluster_score_normalization():
-    # Case 1: The "Cutoff" case (Raw ~60)
+    # Case 1: The "Cutoff" case (Raw ~60 originally, ~65 with w_value=3.0)
     # 5 people, role 10, value 1M (log 6), change 0.5 (50%), fund 0, days 0, ratio 0
-    # Score = 1*5 + 2*10 + 2*6 + 5*0.5 = 5 + 20 + 12 + 2.5 = 39.5
-    # Let's boost it to 60.
-    # Role 20 -> 40.
-    # People 5 -> 5.
-    # Value 1M -> 12.
-    # Change 0.5 -> 2.5.
-    # Sum = 59.5.
+    # With w_value=3.0:
+    # Score = 1*5 + 2*20 + 3*6 + 5*0.5 = 5 + 40 + 18 + 2.5 = 65.5
+    # Via saturation curve: 100 * (1 - exp(-65.5/65)) ≈ 63.6
     score_60 = compute_cluster_score(
         people=5,
         role_score=20,
@@ -21,10 +17,9 @@ def test_cluster_score_normalization():
         avg_days_to_file=0,
         avg_sale_to_purchase_ratio=0
     )
-    # With new logic, this should be close to 60.
-    # With old logic, it is 59.5.
-    print(f"Raw ~60 case: {score_60}")
-    assert 58 < score_60 < 62, f"Expected ~60, got {score_60}"
+    # With w_value=3.0, raw score shifts from ~59.5 to ~65.5, final ~63.6
+    print(f"Raw ~65 case: {score_60}")
+    assert 62 < score_60 < 66, f"Expected ~63.6, got {score_60}"
 
     # Case 2: The "Over 100" case (Raw ~113 like AVBC)
     score_high = compute_cluster_score(
