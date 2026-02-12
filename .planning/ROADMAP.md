@@ -173,8 +173,8 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 17-01-PLAN.md --- Sync enrichment CIK migration (enrich_clusters_with_price.py)
-- [ ] 17-02-PLAN.md --- Async enrichment CIK migration (enrichment_service.py + enrich_clusters_async.py)
+- [x] 17-01-PLAN.md --- Sync enrichment CIK migration (enrich_clusters_with_price.py)
+- [x] 17-02-PLAN.md --- Async enrichment CIK migration (enrichment_service.py + enrich_clusters_async.py)
 
 ## Progress
 
@@ -198,7 +198,7 @@ Phases execute in numeric order: 15 → 16 → 17
 | 14. Float Rounding | v1.1 | 1/1 | Complete | 2026-02-11 |
 | 15. CIK-to-Ticker Mapping | v1.2 | 1/1 | Complete | 2026-02-12 |
 | 16. Schema Re-keying | v1.2 | 1/1 | Complete | 2026-02-12 |
-| 17. Enrichment Pipeline Migration | v1.2 | 0/0 | Not started | - |
+| 17. Enrichment Pipeline Migration | v1.2 | 2/2 | Complete | 2026-02-12 |
 
 ---
-*Last updated: 2026-02-12 after Phase 16 completion*
+*Last updated: 2026-02-12 after Phase 17 completion*
