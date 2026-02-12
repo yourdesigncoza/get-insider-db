@@ -139,10 +139,10 @@ Plans:
   2. Mapping populated from form345_submission table without external API dependency
   3. Script can query "what ticker does CIK 0002076163 currently use?" and get single authoritative answer
   4. When one CIK maps to multiple historical tickers, most recent filing's ticker is returned
-**Plans**: TBD
+**Plans**: 1 plan
 
 Plans:
-- [ ] 15-01: TBD
+- [ ] 15-01-PLAN.md --- Mapping table DDL, population in data load, CikTickerMapper service + tests
 
 #### Phase 16: Schema Re-keying
 **Goal**: Market data organized by permanent CIK identifier, not volatile tickers
