@@ -1,40 +1,67 @@
-# STATE.md
+# Project State
 
 ## Project Reference
 
 See: .planning/PROJECT.md (updated 2026-02-12)
 
 **Core value:** Accurate, actionable cluster buy signals from SEC insider trading data
-**Current focus:** v1.2 CIK-Based Enrichment
+**Current focus:** Phase 15 - CIK-to-Ticker Mapping (v1.2 milestone)
 
 ## Current Position
 
-Phase: Not started (defining requirements)
-Plan: —
-Status: Defining requirements
-Last activity: 2026-02-12 — Milestone v1.2 started
+Phase: 15 of 17 (CIK-to-Ticker Mapping)
+Plan: 0 of 0 in current phase
+Status: Ready to plan
+Last activity: 2026-02-12 — v1.2 roadmap created
 
-Progress: v1.0: ██████████ 100% | v1.1: ██████████ 100% | v1.2: ░░░░░░░░░░ 0%
+Progress: [████████░░] 78% (14/18 plans completed across all milestones)
 
-## Milestone History
+## Performance Metrics
 
-- v1.0 Codebase Remediation: 7 phases, 22 plans (shipped 2026-02-05)
-- v1.1 Result Quality 01: 7 phases, 7 plans (shipped 2026-02-11)
+**Velocity:**
+- Total plans completed: 14
+- Average duration: ~45 min (estimated from v1.0/v1.1)
+- Total execution time: ~10.5 hours across two milestones
 
-Total: 14 phases, 29 plans across 2 milestones
+**By Milestone:**
 
-### Quick Tasks Completed
+| Milestone | Phases | Plans | Duration |
+|-----------|--------|-------|----------|
+| v1.0 | 6 | 10 | 3 days |
+| v1.1 | 7 | 7 | 1 day |
+| v1.2 | 3 | TBD | In progress |
 
-| # | Description | Date | Commit | Directory |
-|---|-------------|------|--------|-----------|
-| 1 | Fund ratio helper, output cap, and edge case tests | 2026-02-12 | 710ad4f | [1-fund-ratio-helper-output-cap-and-edge-ca](./quick/1-fund-ratio-helper-output-cap-and-edge-ca/) |
+**Recent Trend:**
+- v1.1 phases: Single-plan focused execution
+- Trend: Stable, consistent velocity
 
-## Blockers
+*Updated after roadmap creation*
 
-None
+## Accumulated Context
 
-## Notes
+### Decisions
 
-v1.0 milestone shipped: 2026-02-05 (22 plans across 7 phases)
-v1.1 milestone shipped: 2026-02-11 (7 plans across 7 phases)
-Next step: /gsd:new-milestone
+Decisions are logged in PROJECT.md Key Decisions table.
+Recent decisions affecting current work:
+
+- CIK as primary identifier: Tickers change (FB→META), CIK is permanent
+- Latest ticker per CIK: Simple approach covers 99% of cases, no historical tracking
+- Fresh start for market data: Drop + rebuild market tables with CIK keys, re-fetch on enrichment
+- Strict CIK exclusion: No CIK or unmapped CIK = bad data, exclude from output entirely
+
+### Pending Todos
+
+None yet.
+
+### Blockers/Concerns
+
+None yet.
+
+## Session Continuity
+
+Last session: 2026-02-12
+Stopped at: v1.2 roadmap created, ready for `/gsd:plan-phase 15`
+Resume file: None
+
+---
+*Last updated: 2026-02-12 after roadmap creation*

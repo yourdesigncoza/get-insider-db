@@ -46,17 +46,19 @@ Requirements for CIK-Based Enrichment milestone. Each maps to roadmap phases.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| MAP-01 | — | Pending |
-| SCHEMA-01 | — | Pending |
-| ENRICH-01 | — | Pending |
-| ENRICH-02 | — | Pending |
-| ENRICH-03 | — | Pending |
+| MAP-01 | Phase 15 | Pending |
+| SCHEMA-01 | Phase 16 | Pending |
+| ENRICH-01 | Phase 17 | Pending |
+| ENRICH-02 | Phase 17 | Pending |
+| ENRICH-03 | Phase 17 | Pending |
 
 **Coverage:**
 - v1.2 requirements: 5 total
-- Mapped to phases: 0
-- Unmapped: 5
+- Mapped to phases: 5
+- Unmapped: 0
+
+**100% coverage verified**
 
 ---
 *Requirements defined: 2026-02-12*
-*Last updated: 2026-02-12 after initial definition*
+*Last updated: 2026-02-12 after roadmap creation*
