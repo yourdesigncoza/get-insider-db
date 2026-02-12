@@ -70,6 +70,46 @@ def ensure_columns(table: str, df: pd.DataFrame, engine: Engine) -> None:
             conn.execute(text(f'ALTER TABLE "{table}" ADD COLUMN "{col}" TEXT'))
 
 
+def refresh_cik_ticker_mapping(engine: Engine) -> None:
+    """
+    Refresh CIK-ticker mapping from form345_submission.
+    Uses most recent filing date per CIK to determine current ticker.
+    """
+    with engine.begin() as conn:
+        result = conn.execute(text("""
+            INSERT INTO issuer_cik_ticker_map (issuer_cik, ticker, issuer_name, last_seen_date, updated_at)
+            SELECT
+                sub.issuer_cik,
+                sub.ticker,
+                sub.issuer_name,
+                sub.last_seen_date,
+                NOW()
+            FROM (
+                SELECT DISTINCT ON (s."ISSUERCIK")
+                    s."ISSUERCIK" AS issuer_cik,
+                    s."ISSUERTRADINGSYMBOL" AS ticker,
+                    s."ISSUERNAME" AS issuer_name,
+                    MAX(s."FILING_DATE"::date) AS last_seen_date
+                FROM form345_submission s
+                WHERE s."ISSUERCIK" IS NOT NULL
+                  AND s."ISSUERCIK" != ''
+                  AND s."ISSUERTRADINGSYMBOL" IS NOT NULL
+                  AND s."ISSUERTRADINGSYMBOL" != ''
+                GROUP BY s."ISSUERCIK", s."ISSUERTRADINGSYMBOL", s."ISSUERNAME"
+                ORDER BY s."ISSUERCIK", MAX(s."FILING_DATE"::date) DESC
+            ) sub
+            ON CONFLICT (issuer_cik)
+            DO UPDATE SET
+                ticker = EXCLUDED.ticker,
+                issuer_name = EXCLUDED.issuer_name,
+                last_seen_date = EXCLUDED.last_seen_date,
+                updated_at = NOW()
+            WHERE EXCLUDED.last_seen_date > issuer_cik_ticker_map.last_seen_date
+        """))
+        count = result.rowcount
+    print(f"Refreshed CIK-ticker mapping: {count} rows upserted")
+
+
 def load_quarter(dir_path: Path, engine: Engine) -> None:
     for filename, table in TABLE_MAP.items():
         path = dir_path / filename
@@ -102,6 +142,9 @@ def main() -> None:
         already_loaded.add(name)
         save_log(already_loaded)  # persist incrementally in case of later failures
         new_loads += 1
+
+    print("\nRefreshing CIK-ticker mapping...")
+    refresh_cik_ticker_mapping(engine)
 
     print(f"\nDone. New quarters loaded: {new_loads}, total logged: {len(already_loaded)}")
 

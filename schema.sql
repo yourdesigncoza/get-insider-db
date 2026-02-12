@@ -525,6 +525,22 @@ CREATE TABLE public.market_prices (
 ALTER TABLE public.market_prices OWNER TO myuser;
 
 --
+-- TOC entry XXX (class 1259 OID XXXXX)
+-- Name: issuer_cik_ticker_map; Type: TABLE; Schema: public; Owner: myuser
+--
+
+CREATE TABLE IF NOT EXISTS public.issuer_cik_ticker_map (
+    issuer_cik TEXT PRIMARY KEY,
+    ticker TEXT NOT NULL,
+    issuer_name TEXT,
+    last_seen_date DATE NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+ALTER TABLE public.issuer_cik_ticker_map OWNER TO myuser;
+
+--
 -- TOC entry 3299 (class 2604 OID 17705)
 -- Name: cluster_events cluster_id; Type: DEFAULT; Schema: public; Owner: myuser
 --
@@ -657,6 +673,22 @@ CREATE INDEX idx_market_fundamentals_ticker_date ON public.market_fundamentals U
 --
 
 CREATE INDEX idx_market_prices_ticker_date ON public.market_prices USING btree (ticker, price_date);
+
+
+--
+-- TOC entry XXXX (class 1259 OID XXXXX)
+-- Name: idx_cik_ticker_map_ticker; Type: INDEX; Schema: public; Owner: myuser
+--
+
+CREATE INDEX IF NOT EXISTS idx_cik_ticker_map_ticker ON issuer_cik_ticker_map (ticker);
+
+
+--
+-- TOC entry XXXX (class 1259 OID XXXXX)
+-- Name: idx_cik_ticker_map_date; Type: INDEX; Schema: public; Owner: myuser
+--
+
+CREATE INDEX IF NOT EXISTS idx_cik_ticker_map_date ON issuer_cik_ticker_map (last_seen_date DESC);
 
 
 --
