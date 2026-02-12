@@ -142,7 +142,7 @@ Plans:
 **Plans**: 1 plan
 
 Plans:
-- [ ] 15-01-PLAN.md --- Mapping table DDL, population in data load, CikTickerMapper service + tests
+- [x] 15-01-PLAN.md --- Mapping table DDL, population in data load, CikTickerMapper service + tests
 
 #### Phase 16: Schema Re-keying
 **Goal**: Market data organized by permanent CIK identifier, not volatile tickers
@@ -195,9 +195,9 @@ Phases execute in numeric order: 15 → 16 → 17
 | 12. Sale-to-Purchase Ratio Fix | v1.1 | 1/1 | Complete | 2026-02-11 |
 | 13. Duplicate Ticker Handling | v1.1 | 1/1 | Complete | 2026-02-11 |
 | 14. Float Rounding | v1.1 | 1/1 | Complete | 2026-02-11 |
-| 15. CIK-to-Ticker Mapping | v1.2 | 0/0 | Not started | - |
+| 15. CIK-to-Ticker Mapping | v1.2 | 1/1 | Complete | 2026-02-12 |
 | 16. Schema Re-keying | v1.2 | 0/0 | Not started | - |
 | 17. Enrichment Pipeline Migration | v1.2 | 0/0 | Not started | - |
 
 ---
-*Last updated: 2026-02-12 after v1.2 roadmap creation*
+*Last updated: 2026-02-12 after Phase 15 completion*
