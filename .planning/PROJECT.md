@@ -4,7 +4,7 @@
 
 **Name:** get-insider-db
 **Type:** Data pipeline for SEC insider trading analysis
-**Status:** v1.1 shipped — planning next milestone
+**Status:** v1.2 in progress — CIK-Based Enrichment
 
 ## Purpose
 
@@ -57,9 +57,15 @@ Pipeline ingests SEC Form 3/4/5 data, classifies insiders, detects conviction-we
 - ✓ Duplicate ticker handling implemented — v1.1
 - ✓ Numeric fields rounded to 2 decimal places — v1.1
 
-### Active
+### Active (v1.2)
 
-None — planning next milestone.
+- [ ] CIK-to-ticker mapping table built from form345_submission
+- [ ] market_prices and market_fundamentals re-keyed from (ticker, date) to (issuer_cik, date)
+- [ ] cluster_events re-keyed from ticker to issuer_cik
+- [ ] Enrichment scripts use CIK as primary lookup, ticker resolved via mapping
+- [ ] Missing CIK or unmapped CIK clusters excluded from enrichment output
+- [ ] CIK resolution statistics reported at end of enrichment
+- [ ] Mapping refreshed during data load (load_form345_quarter.py)
 
 ### Out of Scope
 
@@ -84,6 +90,10 @@ None — planning next milestone.
 | Dedup as display concern | Both signals valid, user controls output | ✓ Good |
 | Window overlap → keep separate events | Preserves all signals for Phase 13 dedup | ✓ Good |
 | Repository pattern deferred | Batch patterns sufficient | — Pending |
+| CIK as primary identifier | Tickers change, CIK is permanent | — Pending |
+| Latest ticker per CIK (no history) | Simple, covers 99% of cases | — Pending |
+| Fresh start for market data | Clean re-key, re-fetch on enrichment | — Pending |
+| Strict CIK exclusion | No CIK = bad data, exclude entirely | — Pending |
 
 ## Tech Stack
 
@@ -102,4 +112,4 @@ None — planning next milestone.
 
 ---
 
-*Last updated: 2026-02-11 after v1.1 milestone*
+*Last updated: 2026-02-12 after v1.2 milestone start*

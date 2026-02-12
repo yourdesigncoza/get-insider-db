@@ -2,19 +2,19 @@
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-02-11)
+See: .planning/PROJECT.md (updated 2026-02-12)
 
 **Core value:** Accurate, actionable cluster buy signals from SEC insider trading data
-**Current focus:** Planning next milestone
+**Current focus:** v1.2 CIK-Based Enrichment
 
 ## Current Position
 
-Phase: N/A — between milestones
-Plan: N/A
-Status: Ready to plan next milestone
-Last activity: 2026-02-12 - Completed quick task 1: Fund ratio helper, output cap, and edge case tests
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-02-12 — Milestone v1.2 started
 
-Progress: v1.0: ██████████ 100% | v1.1: ██████████ 100%
+Progress: v1.0: ██████████ 100% | v1.1: ██████████ 100% | v1.2: ░░░░░░░░░░ 0%
 
 ## Milestone History
 
