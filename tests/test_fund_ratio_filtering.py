@@ -1,5 +1,6 @@
 import pytest
 import pandas as pd
+from src.analytics.cluster_buys import calc_fund_ratio
 
 
 def apply_fund_ratio_filter(df: pd.DataFrame, max_fund_ratio: float | None) -> pd.DataFrame:
@@ -69,13 +70,63 @@ class TestFundRatioBoundary:
         assert len(result) == 2
 
 
+class TestCalcFundRatioHelper:
+    """Direct unit tests for calc_fund_ratio helper."""
+
+    def test_zero_total_returns_zero(self):
+        assert calc_fund_ratio(0, 0) == 0.0
+
+    def test_negative_total_returns_zero(self):
+        assert calc_fund_ratio(3, -1) == 0.0
+
+    def test_normal_ratio(self):
+        assert calc_fund_ratio(1, 4) == 0.25
+
+    def test_cap_at_one_when_fund_exceeds_total(self):
+        """Bad data: num_fund_like > num_total_insiders should cap at 1.0."""
+        assert calc_fund_ratio(5, 3) == 1.0
+
+    def test_exact_one_not_capped(self):
+        assert calc_fund_ratio(4, 4) == 1.0
+
+
+class TestFundRatioEdgeCases:
+    """Edge cases from Gemini code review."""
+
+    def test_max_fund_ratio_zero_excludes_all(self):
+        """max_fund_ratio=0 should exclude everything: 0.0 < 0 is False."""
+        df = pd.DataFrame([
+            make_cluster_row(0, 5),   # ratio=0.00, but 0.0 < 0 is False
+            make_cluster_row(1, 5),   # ratio=0.20
+        ])
+        result = apply_fund_ratio_filter(df, 0.0)
+        assert len(result) == 0
+
+    def test_float_precision_one_third_boundary(self):
+        """1/3 boundary: num=1, total=3, max=1/3. Exact match -> excluded."""
+        df = pd.DataFrame([make_cluster_row(1, 3)])  # ratio=0.333...
+        result = apply_fund_ratio_filter(df, 1 / 3)
+        # 1/3 == 1/3 in float, so NOT strictly less than -> excluded
+        assert len(result) == 0
+
+    def test_float_precision_just_below_one_third(self):
+        """Ratio just below 1/3 threshold should pass."""
+        df = pd.DataFrame([make_cluster_row(1, 4)])  # ratio=0.25
+        result = apply_fund_ratio_filter(df, 1 / 3)
+        assert len(result) == 1
+
+    def test_fund_like_exceeds_total_in_output(self):
+        """Bad data: fund_like > total should produce capped ratio of 1.0 in output."""
+        assert calc_fund_ratio(5, 3) == 1.0
+        # Verify it does not exceed 1.0
+        assert calc_fund_ratio(100, 1) == 1.0
+
+
 class TestFundRatioInOutput:
-    """Verify fund_ratio field is computed correctly."""
+    """Verify fund_ratio field is computed correctly via helper."""
 
     def test_fund_ratio_calculation(self):
-        ratio = float(2 / max(8, 1))
-        assert ratio == 0.25
+        assert calc_fund_ratio(2, 8) == 0.25
 
     def test_fund_ratio_zero_total(self):
-        ratio = float(0 / max(0, 1))
-        assert ratio == 0.0
+        assert calc_fund_ratio(0, 0) == 0.0
