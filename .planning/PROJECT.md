@@ -4,15 +4,15 @@
 
 **Name:** get-insider-db
 **Type:** Data pipeline for SEC insider trading analysis
-**Status:** v1.2 in progress — CIK-Based Enrichment
+**Status:** v1.2 shipped — CIK-Based Enrichment
 
 ## Purpose
 
 Pipeline ingests SEC Form 3/4/5 data, classifies insiders, detects conviction-weighted "cluster buy" events, enriches with price performance, and exports for backtesting.
 
-## Current State (v1.1)
+## Current State (v1.2)
 
-**Shipped:** 2026-02-11
+**Shipped:** 2026-02-12
 **Capabilities:**
 - Secure parameterized SQL queries (no injection vulnerabilities)
 - Async enrichment pipeline (500-2000 clusters, O(1) memory)
@@ -28,8 +28,12 @@ Pipeline ingests SEC Form 3/4/5 data, classifies insiders, detects conviction-we
 - Sale-to-purchase ratio with P+S transaction data
 - Duplicate ticker handling (--deduplicate flag)
 - 2-decimal float rounding in JSON exports
+- CIK-to-ticker mapping (8,982 mappings from SEC filings)
+- CIK-based primary keys for market_prices, market_fundamentals, cluster_events
+- CIK-first enrichment with strict exclusion of unmapped clusters
+- CIK resolution statistics for data quality monitoring
 
-**Codebase:** 11,243 LOC Python, 139+ tests passing
+**Codebase:** 11,829 LOC Python, 192+ tests passing
 
 ## Requirements
 
@@ -57,15 +61,19 @@ Pipeline ingests SEC Form 3/4/5 data, classifies insiders, detects conviction-we
 - ✓ Duplicate ticker handling implemented — v1.1
 - ✓ Numeric fields rounded to 2 decimal places — v1.1
 
-### Active (v1.2)
+### Validated (v1.2)
 
-- [ ] CIK-to-ticker mapping table built from form345_submission
-- [ ] market_prices and market_fundamentals re-keyed from (ticker, date) to (issuer_cik, date)
-- [ ] cluster_events re-keyed from ticker to issuer_cik
-- [ ] Enrichment scripts use CIK as primary lookup, ticker resolved via mapping
-- [ ] Missing CIK or unmapped CIK clusters excluded from enrichment output
-- [ ] CIK resolution statistics reported at end of enrichment
-- [ ] Mapping refreshed during data load (load_form345_quarter.py)
+- ✓ CIK-to-ticker mapping table built from form345_submission (8,982 mappings) — v1.2
+- ✓ market_prices and market_fundamentals re-keyed from (ticker, date) to (issuer_cik, date) — v1.2
+- ✓ cluster_events re-keyed from ticker to issuer_cik — v1.2
+- ✓ Enrichment scripts use CIK as primary lookup, ticker resolved via mapping — v1.2
+- ✓ Missing CIK or unmapped CIK clusters excluded from enrichment output — v1.2
+- ✓ CIK resolution statistics reported at end of enrichment — v1.2
+- ✓ Mapping refreshed during data load (load_form345_quarter.py) — v1.2
+
+### Active
+
+(None — next milestone TBD)
 
 ### Out of Scope
 
@@ -90,10 +98,13 @@ Pipeline ingests SEC Form 3/4/5 data, classifies insiders, detects conviction-we
 | Dedup as display concern | Both signals valid, user controls output | ✓ Good |
 | Window overlap → keep separate events | Preserves all signals for Phase 13 dedup | ✓ Good |
 | Repository pattern deferred | Batch patterns sufficient | — Pending |
-| CIK as primary identifier | Tickers change, CIK is permanent | — Pending |
-| Latest ticker per CIK (no history) | Simple, covers 99% of cases | — Pending |
-| Fresh start for market data | Clean re-key, re-fetch on enrichment | — Pending |
-| Strict CIK exclusion | No CIK = bad data, exclude entirely | — Pending |
+| CIK as primary identifier | Tickers change, CIK is permanent | ✓ Good |
+| Latest ticker per CIK (no history) | Simple, covers 99% of cases | ✓ Good |
+| Fresh start for market data | Clean re-key, re-fetch on enrichment | ✓ Good |
+| Strict CIK exclusion | No CIK = bad data, exclude entirely | ✓ Good |
+| CIK stored as TEXT | Preserves zero-padding for SEC API compat | ✓ Good |
+| In-memory mapping cache | 8,982 entries = ~300KB, O(1) lookups | ✓ Good |
+| Pre-validation at CLI entry | Exclude bad data before expensive ops | ✓ Good |
 
 ## Tech Stack
 
@@ -112,4 +123,4 @@ Pipeline ingests SEC Form 3/4/5 data, classifies insiders, detects conviction-we
 
 ---
 
-*Last updated: 2026-02-12 after v1.2 milestone start*
+*Last updated: 2026-02-12 after v1.2 milestone*

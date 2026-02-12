@@ -1,5 +1,32 @@
 # Project Milestones: get-insider-db
 
+## v1.2 CIK-Based Enrichment (Shipped: 2026-02-12)
+
+**Delivered:** Replaced volatile ticker-based lookups with permanent CIK identifiers throughout enrichment pipeline, eliminating data fragmentation from ticker changes (FB→META).
+
+**Phases completed:** 15-17 (4 plans total)
+
+**Key accomplishments:**
+
+- Built permanent CIK-to-ticker mapping table (8,982 mappings) with O(1) in-memory lookup service
+- Migrated market_prices, market_fundamentals, and cluster_events to CIK-based primary keys
+- Sync enrichment uses CIK as primary cache key with strict exclusion of unmapped clusters
+- Async enrichment migrated to CIK-based queries with pre-validation at CLI entry point
+- CIK resolution statistics track data quality (resolved/missing/unmapped counts)
+
+**Stats:**
+
+- 23 files changed (+3,543 / -103)
+- 11,829 lines of Python
+- 3 phases, 4 plans, 7 tasks
+- 1 day (2026-02-12)
+
+**Git range:** `feat(15-01)` → `feat(17-02)`
+
+**What's next:** TBD — next milestone planning
+
+---
+
 ## v1.1 Result Quality 01 (Shipped: 2026-02-11)
 
 **Delivered:** Improved cluster scan output quality by filtering false positives, excluding non-tradeable entities, fixing broken features, and cleaning export formatting.
