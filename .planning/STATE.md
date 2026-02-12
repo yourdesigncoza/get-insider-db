@@ -5,7 +5,7 @@
 See: .planning/PROJECT.md (updated 2026-02-12)
 
 **Core value:** Accurate, actionable cluster buy signals from SEC insider trading data
-**Current focus:** Phase 15 - CIK-to-Ticker Mapping (v1.2 milestone)
+**Current focus:** Phase 16 - Schema Re-keying (v1.2 milestone)
 
 ## Current Position
 

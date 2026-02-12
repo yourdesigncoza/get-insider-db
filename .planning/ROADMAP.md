@@ -157,7 +157,7 @@ Plans:
 **Plans**: 1 plan
 
 Plans:
-- [ ] 16-01-PLAN.md --- Migration SQL scripts + schema.sql DDL update for CIK-based keys
+- [x] 16-01-PLAN.md --- Migration SQL scripts + schema.sql DDL update for CIK-based keys
 
 #### Phase 17: Enrichment Pipeline Migration
 **Goal**: Price enrichment works with CIK as primary key, tickers resolved for API calls
@@ -196,8 +196,8 @@ Phases execute in numeric order: 15 → 16 → 17
 | 13. Duplicate Ticker Handling | v1.1 | 1/1 | Complete | 2026-02-11 |
 | 14. Float Rounding | v1.1 | 1/1 | Complete | 2026-02-11 |
 | 15. CIK-to-Ticker Mapping | v1.2 | 1/1 | Complete | 2026-02-12 |
-| 16. Schema Re-keying | v1.2 | 0/0 | Not started | - |
+| 16. Schema Re-keying | v1.2 | 1/1 | Complete | 2026-02-12 |
 | 17. Enrichment Pipeline Migration | v1.2 | 0/0 | Not started | - |
 
 ---
-*Last updated: 2026-02-12 after Phase 15 completion*
+*Last updated: 2026-02-12 after Phase 16 completion*
