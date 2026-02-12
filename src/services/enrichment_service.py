@@ -19,6 +19,7 @@ from sqlalchemy import text
 from src.async_client import AsyncHTTPClient, async_session_factory, async_retry
 from src.cluster_scoring import compute_market_cap_adjusted_score
 from src.exceptions import EnrichmentError, InvalidTickerError, RateLimitError
+from src.services.cik_ticker_mapping import get_mapper
 
 logger = structlog.get_logger(__name__)
 
@@ -182,19 +183,20 @@ class AsyncEnricher:
             max_concurrent=max_concurrent,
         )
         self._session_factory = async_session_factory()
+        self._mapper = get_mapper()
 
     # -------------------------------------------------------------------------
     # PRICE CACHE METHODS
     # -------------------------------------------------------------------------
 
     async def _check_price_cache(
-        self, ticker: str, start: datetime, end: datetime
+        self, issuer_cik: str, start: datetime, end: datetime
     ) -> list[dict]:
         """
         Query market_prices table for cached prices in date range.
 
         Args:
-            ticker: Stock ticker symbol.
+            issuer_cik: Issuer CIK identifier.
             start: Start date for price range.
             end: End date for price range.
 
@@ -206,11 +208,11 @@ class AsyncEnricher:
                 text("""
                     SELECT price_date, close_price
                     FROM market_prices
-                    WHERE ticker = :ticker
+                    WHERE issuer_cik = :issuer_cik
                       AND price_date BETWEEN :start AND :end
                     ORDER BY price_date
                 """),
-                {"ticker": ticker, "start": start.date(), "end": end.date()},
+                {"issuer_cik": issuer_cik, "start": start.date(), "end": end.date()},
             )
             rows = result.fetchall()
 
@@ -223,12 +225,13 @@ class AsyncEnricher:
         ]
 
     async def _save_prices_to_cache(
-        self, ticker: str, prices: list[dict]
+        self, issuer_cik: str, ticker: str, prices: list[dict]
     ) -> None:
         """
         Batch insert prices into market_prices table.
 
         Args:
+            issuer_cik: Issuer CIK identifier.
             ticker: Stock ticker symbol.
             prices: List of price records to save.
         """
@@ -239,11 +242,12 @@ class AsyncEnricher:
             for p in prices:
                 await session.execute(
                     text("""
-                        INSERT INTO market_prices (ticker, price_date, close_price)
-                        VALUES (:ticker, :date, :price)
-                        ON CONFLICT (ticker, price_date) DO NOTHING
+                        INSERT INTO market_prices (issuer_cik, ticker, price_date, close_price)
+                        VALUES (:issuer_cik, :ticker, :date, :price)
+                        ON CONFLICT (issuer_cik, price_date) DO NOTHING
                     """),
                     {
+                        "issuer_cik": issuer_cik,
                         "ticker": ticker,
                         "date": p["date"].date(),
                         "price": p["close"],
@@ -256,13 +260,13 @@ class AsyncEnricher:
     # -------------------------------------------------------------------------
 
     async def _check_fundamentals_cache(
-        self, ticker: str, target_date: datetime
+        self, issuer_cik: str, target_date: datetime
     ) -> dict | None:
         """
         Query market_fundamentals table for cached fundamentals near target date.
 
         Args:
-            ticker: Stock ticker symbol.
+            issuer_cik: Issuer CIK identifier.
             target_date: Target date to find fundamentals for.
 
         Returns:
@@ -276,13 +280,13 @@ class AsyncEnricher:
                 text("""
                     SELECT date, market_cap, enterprise_value, pe_ratio, pb_ratio, trailing_peg_ratio
                     FROM market_fundamentals
-                    WHERE ticker = :ticker
+                    WHERE issuer_cik = :issuer_cik
                       AND date BETWEEN :start AND :end
                     ORDER BY date DESC
                     LIMIT 40
                 """),
                 {
-                    "ticker": ticker,
+                    "issuer_cik": issuer_cik,
                     "start": start_search.date(),
                     "end": end_search.date(),
                 },
@@ -317,12 +321,13 @@ class AsyncEnricher:
         return candidates[0]
 
     async def _save_fundamentals_to_cache(
-        self, ticker: str, data: dict
+        self, issuer_cik: str, ticker: str, data: dict
     ) -> None:
         """
         Insert fundamental record into market_fundamentals table.
 
         Args:
+            issuer_cik: Issuer CIK identifier.
             ticker: Stock ticker symbol.
             data: Fundamental record to save.
         """
@@ -333,12 +338,13 @@ class AsyncEnricher:
             await session.execute(
                 text("""
                     INSERT INTO market_fundamentals (
-                        ticker, date, market_cap, enterprise_value, pe_ratio, pb_ratio, trailing_peg_ratio
+                        issuer_cik, ticker, date, market_cap, enterprise_value, pe_ratio, pb_ratio, trailing_peg_ratio
                     ) VALUES (
-                        :ticker, :date, :mc, :ev, :pe, :pb, :peg
-                    ) ON CONFLICT (ticker, date) DO NOTHING
+                        :issuer_cik, :ticker, :date, :mc, :ev, :pe, :pb, :peg
+                    ) ON CONFLICT (issuer_cik, date) DO NOTHING
                 """),
                 {
+                    "issuer_cik": issuer_cik,
                     "ticker": ticker,
                     "date": data["date"].date(),
                     "mc": data.get("marketCap"),
@@ -616,7 +622,7 @@ class AsyncEnricher:
     # -------------------------------------------------------------------------
 
     async def get_price_history(
-        self, ticker: str, start: datetime, end: datetime
+        self, issuer_cik: str, start: datetime, end: datetime
     ) -> tuple[list[dict], bool]:
         """
         Get price history with cache-first pattern and YFinance fallback.
@@ -625,7 +631,7 @@ class AsyncEnricher:
         falls back to YFinance if API returns no data, and saves new data to cache.
 
         Args:
-            ticker: Stock ticker symbol.
+            issuer_cik: Issuer CIK identifier.
             start: Start date for price range.
             end: End date for price range.
 
@@ -633,12 +639,20 @@ class AsyncEnricher:
             Tuple of (price_records, used_yfinance_fallback).
             price_records: List of [{"date": datetime, "close": float}, ...].
             used_yfinance_fallback: True if YFinance provided the data.
+
+        Raises:
+            ValueError: If no ticker mapping found for CIK.
         """
+        # Resolve ticker from mapper
+        ticker = self._mapper.get_ticker(issuer_cik)
+        if not ticker:
+            raise ValueError(f"No ticker mapping for CIK: {issuer_cik}")
+
         # Look back 7 days to capture start date if it's a weekend
         fetch_start = start - timedelta(days=7)
 
         # 1. Check cache
-        db_prices = await self._check_price_cache(ticker, fetch_start, end)
+        db_prices = await self._check_price_cache(issuer_cik, fetch_start, end)
 
         days_needed = (end - start).days
         needs_fetch = False
@@ -662,12 +676,12 @@ class AsyncEnricher:
         if not needs_fetch:
             return db_prices, False
 
-        # 2. Fetch from API
+        # 2. Fetch from API (using ticker)
         api_prices = await self._fetch_prices_from_api(ticker, fetch_start, end)
 
         if api_prices:
             # 3. Save to cache
-            await self._save_prices_to_cache(ticker, api_prices)
+            await self._save_prices_to_cache(issuer_cik, ticker, api_prices)
             return api_prices, False
 
         # 4. API returned empty - try YFinance fallback
@@ -683,14 +697,14 @@ class AsyncEnricher:
             # Create synthetic single-point history
             synthetic_history = [{"date": start, "close": fallback_price}]
             # Save to cache for future use
-            await self._save_prices_to_cache(ticker, synthetic_history)
+            await self._save_prices_to_cache(issuer_cik, ticker, synthetic_history)
             return synthetic_history, True
 
         # 5. Both API and YFinance failed, return cached data if any
         return db_prices, False
 
     async def get_fundamentals(
-        self, ticker: str, target_date: datetime
+        self, issuer_cik: str, target_date: datetime
     ) -> dict | None:
         """
         Get fundamental data with cache-first pattern.
@@ -699,25 +713,33 @@ class AsyncEnricher:
         and saves new data to cache.
 
         Args:
-            ticker: Stock ticker symbol.
+            issuer_cik: Issuer CIK identifier.
             target_date: Target date to find fundamentals for.
 
         Returns:
             Fundamental record dict or None if not found.
+
+        Raises:
+            ValueError: If no ticker mapping found for CIK.
         """
+        # Resolve ticker from mapper
+        ticker = self._mapper.get_ticker(issuer_cik)
+        if not ticker:
+            raise ValueError(f"No ticker mapping for CIK: {issuer_cik}")
+
         # 1. Check cache
-        cached = await self._check_fundamentals_cache(ticker, target_date)
+        cached = await self._check_fundamentals_cache(issuer_cik, target_date)
         if cached:
             return cached
 
-        # 2. Fetch from API
+        # 2. Fetch from API (using ticker)
         api_data = await self._fetch_fundamentals_from_api(ticker, target_date)
 
         if not api_data:
             return None
 
         # 3. Save to cache
-        await self._save_fundamentals_to_cache(ticker, api_data)
+        await self._save_fundamentals_to_cache(issuer_cik, ticker, api_data)
 
         return api_data
 
@@ -728,16 +750,28 @@ class AsyncEnricher:
         Fetches prices and fundamentals concurrently for the cluster.
 
         Args:
-            cluster: Cluster dict with ticker, window_end, entry_date, etc.
+            cluster: Cluster dict with issuer_cik, window_end, entry_date, etc.
 
         Returns:
             Enriched cluster dict with price and fundamental fields.
         """
-        ticker = cluster.get("ticker")
+        issuer_cik = cluster.get("issuer_cik")
         window_end_str = cluster.get("window_end")
         total_value = cluster.get("total_value", 0)
 
-        if not ticker or not window_end_str:
+        # Defense-in-depth: skip if no CIK (pre-validation should happen in CLI)
+        if not issuer_cik:
+            return cluster
+
+        # Resolve ticker from mapper
+        ticker = self._mapper.get_ticker(issuer_cik)
+        if not ticker:
+            # Return cluster with unmapped_cik status
+            new_row = cluster.copy()
+            new_row["enrichment_status"] = "unmapped_cik"
+            return new_row
+
+        if not window_end_str:
             return cluster
 
         try:
@@ -774,8 +808,8 @@ class AsyncEnricher:
         used_yfinance_fallback = False
 
         results = await asyncio.gather(
-            self.get_price_history(ticker, entry_date, price_fetch_end),
-            self.get_fundamentals(ticker, entry_date),
+            self.get_price_history(issuer_cik, entry_date, price_fetch_end),
+            self.get_fundamentals(issuer_cik, entry_date),
             return_exceptions=True,
         )
 
@@ -907,6 +941,7 @@ class AsyncEnricher:
                 error = EnrichmentError(
                     "Enrichment failed for cluster",
                     context={
+                        "issuer_cik": cluster.get("issuer_cik"),
                         "ticker": cluster.get("ticker"),
                         "error": str(result),
                         "error_type": type(result).__name__,
