@@ -682,7 +682,7 @@ def enrich_row(row: Dict[str, Any], stats: Optional[EnrichmentStats] = None) -> 
         logger.warning("cluster_missing_cik", cluster_id=row.get("id"), ticker=row.get("ticker"))
         if stats:
             stats.missing_cik += 1
-        return row
+        return None
 
     # Resolve ticker from CIK
     ticker = mapper.get_ticker(issuer_cik)
@@ -690,7 +690,7 @@ def enrich_row(row: Dict[str, Any], stats: Optional[EnrichmentStats] = None) -> 
         logger.warning("cluster_unmapped_cik", cluster_id=row.get("id"), issuer_cik=issuer_cik)
         if stats:
             stats.unmapped_cik += 1
-        return row
+        return None
 
     if stats:
         stats.resolved += 1
@@ -938,7 +938,8 @@ def process_file(file_path: Path, resume: bool = True):
 
         try:
             enriched = enrich_row(row, stats)
-            enriched_rows.append(enriched)
+            if enriched is not None:
+                enriched_rows.append(enriched)
             processed_tickers.append(ticker)
         except (ValueError, KeyError, TypeError, AttributeError) as e:
             logger.error(f"Error enriching {ticker}: {e}", ticker=ticker, error=str(e), error_type=type(e).__name__)
