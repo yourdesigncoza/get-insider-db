@@ -53,7 +53,8 @@ ALTER TABLE public.cluster_event_members OWNER TO myuser;
 
 CREATE TABLE public.cluster_events (
     cluster_id bigint NOT NULL,
-    ticker text NOT NULL,
+    ticker text,
+    issuer_cik text NOT NULL,
     window_start date NOT NULL,
     window_end date NOT NULL,
     signal_date date NOT NULL,
@@ -80,6 +81,7 @@ ALTER TABLE public.cluster_events OWNER TO myuser;
 CREATE VIEW public.cluster_events_active_window AS
  SELECT cluster_id,
     ticker,
+    issuer_cik,
     signal_date,
     expiry_date,
     status,
@@ -495,7 +497,8 @@ ALTER VIEW public.insider_trades_with_title OWNER TO myuser;
 --
 
 CREATE TABLE public.market_fundamentals (
-    ticker text NOT NULL,
+    issuer_cik text NOT NULL,
+    ticker text,
     date date NOT NULL,
     market_cap numeric,
     enterprise_value numeric,
@@ -514,7 +517,8 @@ ALTER TABLE public.market_fundamentals OWNER TO myuser;
 --
 
 CREATE TABLE public.market_prices (
-    ticker text NOT NULL,
+    issuer_cik text NOT NULL,
+    ticker text,
     price_date date NOT NULL,
     close_price numeric(18,6),
     adj_close_price numeric(18,6),
@@ -606,7 +610,7 @@ ALTER TABLE ONLY public.insider_exclusions
 --
 
 ALTER TABLE ONLY public.market_fundamentals
-    ADD CONSTRAINT market_fundamentals_pkey PRIMARY KEY (ticker, date);
+    ADD CONSTRAINT market_fundamentals_pkey PRIMARY KEY (issuer_cik, date);
 
 
 --
@@ -615,7 +619,7 @@ ALTER TABLE ONLY public.market_fundamentals
 --
 
 ALTER TABLE ONLY public.market_prices
-    ADD CONSTRAINT market_prices_pkey PRIMARY KEY (ticker, price_date);
+    ADD CONSTRAINT market_prices_pkey PRIMARY KEY (issuer_cik, price_date);
 
 
 --
@@ -644,6 +648,14 @@ CREATE INDEX idx_cluster_events_ticker_signal ON public.cluster_events USING btr
 
 
 --
+-- TOC entry XXXX (class 1259 OID XXXXX)
+-- Name: idx_cluster_events_issuer_cik; Type: INDEX; Schema: public; Owner: myuser
+--
+
+CREATE INDEX idx_cluster_events_issuer_cik ON public.cluster_events USING btree (issuer_cik);
+
+
+--
 -- TOC entry 3327 (class 1259 OID 17744)
 -- Name: idx_cluster_members_cluster; Type: INDEX; Schema: public; Owner: myuser
 --
@@ -664,7 +676,7 @@ CREATE INDEX idx_cluster_members_ticker_date ON public.cluster_event_members USI
 -- Name: idx_market_fundamentals_ticker_date; Type: INDEX; Schema: public; Owner: myuser
 --
 
-CREATE INDEX idx_market_fundamentals_ticker_date ON public.market_fundamentals USING btree (ticker, date);
+CREATE INDEX idx_market_fundamentals_ticker ON public.market_fundamentals USING btree (ticker);
 
 
 --
@@ -672,7 +684,7 @@ CREATE INDEX idx_market_fundamentals_ticker_date ON public.market_fundamentals U
 -- Name: idx_market_prices_ticker_date; Type: INDEX; Schema: public; Owner: myuser
 --
 
-CREATE INDEX idx_market_prices_ticker_date ON public.market_prices USING btree (ticker, price_date);
+CREATE INDEX idx_market_prices_ticker ON public.market_prices USING btree (ticker);
 
 
 --
@@ -770,6 +782,15 @@ CREATE INDEX idx_subm_ticker_filingdate ON public.form345_submission USING btree
 
 ALTER TABLE ONLY public.cluster_event_members
     ADD CONSTRAINT cluster_event_members_cluster_id_fkey FOREIGN KEY (cluster_id) REFERENCES public.cluster_events(cluster_id) ON DELETE CASCADE;
+
+
+--
+-- TOC entry XXXX (class 2606 OID XXXXX)
+-- Name: cluster_events fk_cluster_events_issuer_cik; Type: FK CONSTRAINT; Schema: public; Owner: myuser
+--
+
+ALTER TABLE ONLY public.cluster_events
+    ADD CONSTRAINT fk_cluster_events_issuer_cik FOREIGN KEY (issuer_cik) REFERENCES public.issuer_cik_ticker_map(issuer_cik);
 
 
 --
