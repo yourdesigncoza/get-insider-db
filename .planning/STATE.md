@@ -12,7 +12,7 @@ See: .planning/PROJECT.md (updated 2026-02-11)
 Phase: N/A — between milestones
 Plan: N/A
 Status: Ready to plan next milestone
-Last activity: 2026-02-11 — v1.1 milestone complete
+Last activity: 2026-02-12 - Completed quick task 1: Fund ratio helper, output cap, and edge case tests
 
 Progress: v1.0: ██████████ 100% | v1.1: ██████████ 100%
 
@@ -22,6 +22,12 @@ Progress: v1.0: ██████████ 100% | v1.1: ██████�
 - v1.1 Result Quality 01: 7 phases, 7 plans (shipped 2026-02-11)
 
 Total: 14 phases, 29 plans across 2 milestones
+
+### Quick Tasks Completed
+
+| # | Description | Date | Commit | Directory |
+|---|-------------|------|--------|-----------|
+| 1 | Fund ratio helper, output cap, and edge case tests | 2026-02-12 | 710ad4f | [1-fund-ratio-helper-output-cap-and-edge-ca](./quick/1-fund-ratio-helper-output-cap-and-edge-ca/) |
 
 ## Blockers
 
