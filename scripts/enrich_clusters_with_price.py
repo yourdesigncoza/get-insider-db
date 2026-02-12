@@ -37,6 +37,7 @@ from src.config import get_engine
 from src.cluster_scoring import compute_market_cap_adjusted_score
 from src.exceptions import EnrichmentError, InvalidTickerError, RateLimitError
 from src.logging_config import configure_logging, get_logger
+from src.services.cik_ticker_mapping import get_mapper
 
 # Configure logging at module load
 configure_logging()
@@ -83,6 +84,9 @@ class EnrichmentStats:
     fundamentals_success: int = 0
     fundamentals_fail: int = 0
     failed_tickers: List[str] = field(default_factory=list)
+    missing_cik: int = 0
+    unmapped_cik: int = 0
+    resolved: int = 0
 
     def report(self) -> None:
         """Log final enrichment statistics."""
@@ -93,6 +97,11 @@ class EnrichmentStats:
             f"Enrichment complete: {self.total_clusters} clusters, "
             f"{self.price_success}/{price_total} prices ({price_rate:.1f}% success), "
             f"{self.fundamentals_success} fundamentals"
+        )
+
+        logger.info(
+            f"CIK resolution: {self.resolved}/{self.total_clusters} resolved, "
+            f"{self.missing_cik} missing CIK, {self.unmapped_cik} no ticker mapping"
         )
 
         if self.price_fallback_success > 0:
@@ -154,30 +163,30 @@ def _make_request(url, params):
 # PRICE CACHE LOGIC
 # -------------------------------------------------------------------------
 
-def _fetch_prices_from_db(ticker: str, start_date: datetime, end_date: datetime) -> List[Dict[str, Any]]:
+def _fetch_prices_from_db(issuer_cik: str, start_date: datetime, end_date: datetime) -> List[Dict[str, Any]]:
     """Fetch cached prices from DB."""
     engine = get_engine()
     with engine.connect() as conn:
         rows = conn.execute(text("""
             SELECT price_date, close_price
             FROM market_prices
-            WHERE ticker = :ticker
+            WHERE issuer_cik = :issuer_cik
               AND price_date BETWEEN :start AND :end
             ORDER BY price_date
         """), {
-            "ticker": ticker,
+            "issuer_cik": issuer_cik,
             "start": start_date.date(),
             "end": end_date.date()
         }).fetchall()
 
     if rows:
-        logger.debug(f"Found {len(rows)} cached prices for {ticker} from DB")
+        logger.debug(f"Found {len(rows)} cached prices for CIK {issuer_cik} from DB")
     else:
-        logger.debug(f"No cached prices for {ticker} in DB")
+        logger.debug(f"No cached prices for CIK {issuer_cik} in DB")
 
     return [{"date": datetime.combine(row[0], datetime.min.time()), "close": float(row[1])} for row in rows]
 
-def _save_prices_to_db(ticker: str, prices: List[Dict[str, Any]]):
+def _save_prices_to_db(issuer_cik: str, ticker: str, prices: List[Dict[str, Any]]):
     """Batch insert prices into DB."""
     if not prices:
         return
@@ -186,17 +195,17 @@ def _save_prices_to_db(ticker: str, prices: List[Dict[str, Any]]):
     with engine.begin() as conn:
         for p in prices:
             conn.execute(text("""
-                INSERT INTO market_prices (ticker, price_date, close_price)
-                VALUES (:ticker, :date, :price)
-                ON CONFLICT (ticker, price_date) DO NOTHING
+                INSERT INTO market_prices (issuer_cik, ticker, price_date, close_price)
+                VALUES (:issuer_cik, :ticker, :date, :price)
+                ON CONFLICT (issuer_cik, price_date) DO NOTHING
             """), {
+                "issuer_cik": issuer_cik,
                 "ticker": ticker,
                 "date": p["date"].date(),
                 "price": p["close"]
             })
 
-@lru_cache(maxsize=1024)
-def _get_price_history(ticker: str, start_date: datetime, end_date: datetime) -> List[Dict[str, Any]]:
+def _get_price_history(issuer_cik: str, ticker: str, start_date: datetime, end_date: datetime) -> List[Dict[str, Any]]:
     """
     Fetch daily price history.
     1. Check DB.
@@ -210,7 +219,7 @@ def _get_price_history(ticker: str, start_date: datetime, end_date: datetime) ->
         # 1. Try DB
         # Look back 7 days to ensure we capture the start date price if it falls on a weekend
         fetch_start = start_date - timedelta(days=7)
-        db_prices = _fetch_prices_from_db(ticker, fetch_start, end_date)
+        db_prices = _fetch_prices_from_db(issuer_cik, fetch_start, end_date)
 
         days_needed = (end_date - start_date).days
 
@@ -271,14 +280,14 @@ def _get_price_history(ticker: str, start_date: datetime, end_date: datetime) ->
         cleaned_data = [d for d in cleaned_data if fetch_start <= d['date'] <= end_date]
 
         # 3. Save to DB
-        _save_prices_to_db(ticker, cleaned_data)
+        _save_prices_to_db(issuer_cik, ticker, cleaned_data)
 
         return sorted(cleaned_data, key=lambda x: x['date'])
 
     except InvalidTickerError:
         raise
     except (requests.RequestException, json.JSONDecodeError, KeyError, ValueError) as e:
-        logger.warning("api_request_failed", ticker=ticker, error=str(e), error_type=type(e).__name__)
+        logger.warning("api_request_failed", issuer_cik=issuer_cik, ticker=ticker, error=str(e), error_type=type(e).__name__)
         return []
 
 def _fetch_price_yfinance(ticker: str, target_date: date) -> Optional[float]:
@@ -324,7 +333,7 @@ def _fetch_price_yfinance(ticker: str, target_date: date) -> Optional[float]:
 # FUNDAMENTALS CACHE LOGIC
 # -------------------------------------------------------------------------
 
-def _fetch_fundamentals_from_db(ticker: str, target_date: datetime) -> Optional[Dict[str, Any]]:
+def _fetch_fundamentals_from_db(issuer_cik: str, target_date: datetime) -> Optional[Dict[str, Any]]:
     """Fetch cached fundamentals for a specific date (closest to target_date)."""
     engine = get_engine()
     # Financial metrics are typically periodic (quarterly/TTM), not daily.
@@ -336,12 +345,12 @@ def _fetch_fundamentals_from_db(ticker: str, target_date: datetime) -> Optional[
         rows = conn.execute(text("""
             SELECT date, market_cap, enterprise_value, pe_ratio, pb_ratio, trailing_peg_ratio
             FROM market_fundamentals
-            WHERE ticker = :ticker
+            WHERE issuer_cik = :issuer_cik
               AND date BETWEEN :start AND :end
             ORDER BY date DESC
             LIMIT 40
         """), {
-            "ticker": ticker,
+            "issuer_cik": issuer_cik,
             "start": start_search.date(),
             "end": end_search.date(),
         }).fetchall()
@@ -377,12 +386,12 @@ def _fetch_fundamentals_from_db(ticker: str, target_date: datetime) -> Optional[
             )
         )
         best = candidates[0]
-        logger.debug(f"Found cached fundamentals for {ticker} from DB")
+        logger.debug(f"Found cached fundamentals for CIK {issuer_cik} from DB")
         return best
-    logger.debug(f"No cached fundamentals for {ticker} in DB")
+    logger.debug(f"No cached fundamentals for CIK {issuer_cik} in DB")
     return None
 
-def _save_fundamentals_to_db(ticker: str, data: List[Dict[str, Any]]):
+def _save_fundamentals_to_db(issuer_cik: str, ticker: str, data: List[Dict[str, Any]]):
     """Batch insert fundamentals."""
     if not data:
         return
@@ -392,11 +401,12 @@ def _save_fundamentals_to_db(ticker: str, data: List[Dict[str, Any]]):
         for d in data:
             conn.execute(text("""
                 INSERT INTO market_fundamentals (
-                    ticker, date, market_cap, enterprise_value, pe_ratio, pb_ratio, trailing_peg_ratio
+                    issuer_cik, ticker, date, market_cap, enterprise_value, pe_ratio, pb_ratio, trailing_peg_ratio
                 ) VALUES (
-                    :ticker, :date, :mc, :ev, :pe, :pb, :peg
-                ) ON CONFLICT (ticker, date) DO NOTHING
+                    :issuer_cik, :ticker, :date, :mc, :ev, :pe, :pb, :peg
+                ) ON CONFLICT (issuer_cik, date) DO NOTHING
             """), {
+                "issuer_cik": issuer_cik,
                 "ticker": ticker,
                 "date": d["date"].date(),
                 "mc": d.get("marketCap"),
@@ -521,7 +531,7 @@ def _estimate_financial_metrics_limit(target_date: datetime, period: str) -> int
     est = max(12, est)
     return min(est, FINANCIAL_METRICS_MAX_LIMIT)
 
-def _get_fundamental_at_date(ticker: str, target_date: datetime, price_at_date: Optional[float] = None) -> Optional[Dict[str, Any]]:
+def _get_fundamental_at_date(issuer_cik: str, ticker: str, target_date: datetime, price_at_date: Optional[float] = None) -> Optional[Dict[str, Any]]:
     """
     Get fundamentals for a specific date.
     1. Check DB.
@@ -530,7 +540,7 @@ def _get_fundamental_at_date(ticker: str, target_date: datetime, price_at_date: 
     """
     try:
         # 1. Try DB
-        cached = _fetch_fundamentals_from_db(ticker, target_date)
+        cached = _fetch_fundamentals_from_db(issuer_cik, target_date)
         if cached:
             return cached
 
@@ -614,21 +624,24 @@ def _get_fundamental_at_date(ticker: str, target_date: datetime, price_at_date: 
         best = candidates[0]
         if best["date"].date() > target_date.date():
             logger.debug(
-                f"Using next-period fundamentals for {ticker}: {best['date'].date()} (window_end={target_date.date()})"
+                f"Using next-period fundamentals for {issuer_cik} ({ticker}): {best['date'].date()} (window_end={target_date.date()})"
             )
 
-        _save_fundamentals_to_db(ticker, [best])
+        _save_fundamentals_to_db(issuer_cik, ticker, [best])
         return best
 
     except InvalidTickerError:
         raise
     except (ValueError, KeyError, TypeError) as e:
-        logger.warning("fundamental_processing_error", ticker=ticker, error=str(e), error_type=type(e).__name__)
+        logger.warning("fundamental_processing_error", issuer_cik=issuer_cik, ticker=ticker, error=str(e), error_type=type(e).__name__)
         return None
 
 # -------------------------------------------------------------------------
 # CALCS & ENRICHMENT
 # -------------------------------------------------------------------------
+
+# Lazy-init global mapper
+mapper = None
 
 def _calculate_max_drawdown(prices: List[float], base_price: float) -> Optional[float]:
     if not prices or base_price is None or base_price == 0:
@@ -655,14 +668,37 @@ def _get_first_price_record_on_or_after(history: List[Dict], target_date: dateti
     return None
 
 def enrich_row(row: Dict[str, Any], stats: Optional[EnrichmentStats] = None) -> Dict[str, Any]:
-    ticker = row.get("ticker")
-    window_end_str = row.get("window_end")
-    total_value = row.get("total_value", 0)
+    # Lazy-init mapper
+    global mapper
+    if mapper is None:
+        mapper = get_mapper()
 
     if stats:
         stats.total_clusters += 1
 
-    if not ticker or not window_end_str:
+    # Pre-validate: CIK required
+    issuer_cik = row.get("issuer_cik")
+    if not issuer_cik:
+        logger.warning("cluster_missing_cik", cluster_id=row.get("id"), ticker=row.get("ticker"))
+        if stats:
+            stats.missing_cik += 1
+        return row
+
+    # Resolve ticker from CIK
+    ticker = mapper.get_ticker(issuer_cik)
+    if not ticker:
+        logger.warning("cluster_unmapped_cik", cluster_id=row.get("id"), issuer_cik=issuer_cik)
+        if stats:
+            stats.unmapped_cik += 1
+        return row
+
+    if stats:
+        stats.resolved += 1
+
+    window_end_str = row.get("window_end")
+    total_value = row.get("total_value", 0)
+
+    if not window_end_str:
         return row
 
     try:
@@ -715,10 +751,10 @@ def enrich_row(row: Dict[str, Any], stats: Optional[EnrichmentStats] = None) -> 
     enrichment_errors: List[str] = []
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
-        future_prices = executor.submit(_get_price_history, ticker, entry_date, price_fetch_end)
+        future_prices = executor.submit(_get_price_history, issuer_cik, ticker, entry_date, price_fetch_end)
         # We don't pass price_at_date here yet, effectively disabling YF inside this parallel call if Tiingo fails
         # We will handle YF fallback explicitly after if needed.
-        future_fundamentals = executor.submit(_get_fundamental_at_date, ticker, entry_date, None)
+        future_fundamentals = executor.submit(_get_fundamental_at_date, issuer_cik, ticker, entry_date, None)
 
         try:
             history = future_prices.result()
@@ -895,8 +931,10 @@ def process_file(file_path: Path, resume: bool = True):
 
     for i in range(start_index, total):
         row = rows[i]
-        ticker = row.get("ticker", f"row_{i}")
-        logger.info(f"  [{i+1}/{total}] Enriching {ticker}...")
+        issuer_cik = row.get("issuer_cik", "")
+        ticker = row.get("ticker", "")
+        display_name = f"{issuer_cik} ({ticker})" if issuer_cik and ticker else issuer_cik or ticker or f"row_{i}"
+        logger.info(f"  [{i+1}/{total}] Enriching {display_name}...")
 
         try:
             enriched = enrich_row(row, stats)
