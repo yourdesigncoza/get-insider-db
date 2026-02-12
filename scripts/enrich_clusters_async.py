@@ -24,6 +24,7 @@ from typing import Iterator
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.services.enrichment_service import AsyncEnricher
+from src.services.cik_ticker_mapping import get_mapper
 from src.services.streaming import (
     stream_clusters,
     read_metadata,
@@ -53,6 +54,9 @@ class EnrichmentStats:
     errors: int = 0
     unsupported_ticker: int = 0
     no_price_data: int = 0
+    missing_cik: int = 0
+    unmapped_cik: int = 0
+    resolved: int = 0
     failed_tickers: list[str] = field(default_factory=list)
 
     def record(self, cluster: dict) -> None:
@@ -78,6 +82,9 @@ class EnrichmentStats:
         total = self.total_clusters
         success_rate = (self.success / total * 100) if total > 0 else 0
 
+        # Calculate total attempted (including excluded)
+        total_attempted = self.total_clusters + self.missing_cik + self.unmapped_cik
+
         logger.info(
             "enrichment_complete",
             total=total,
@@ -87,6 +94,15 @@ class EnrichmentStats:
             unsupported=self.unsupported_ticker,
             no_price_data=self.no_price_data,
             success_rate=f"{success_rate:.1f}%",
+        )
+
+        logger.info(
+            "cik_resolution",
+            resolved=self.resolved,
+            missing_cik=self.missing_cik,
+            unmapped_cik=self.unmapped_cik,
+            total_attempted=total_attempted,
+            message=f"CIK resolution: {self.resolved}/{total_attempted} resolved, {self.missing_cik} missing CIK, {self.unmapped_cik} no ticker mapping",
         )
 
         if self.failed_tickers:
@@ -154,6 +170,9 @@ async def enrich_streaming(
     stats = EnrichmentStats()
     start_time = time.time()
 
+    # Initialize CIK-ticker mapper for pre-validation
+    mapper = get_mapper()
+
     # Read metadata separately (streaming)
     metadata = read_metadata(file_path)
     metadata["enriched_at"] = datetime.now().isoformat()
@@ -184,8 +203,40 @@ async def enrich_streaming(
                     logger.warning("shutdown_requested", processed=processed)
                     break
 
-                # Process batch asynchronously
-                enriched_batch = await enricher.enrich_batch(batch)
+                # Pre-validate batch: filter out clusters with missing/unmapped CIK
+                validated_batch = []
+                for cluster in batch:
+                    issuer_cik = cluster.get("issuer_cik")
+
+                    # Skip if no CIK
+                    if not issuer_cik:
+                        stats.missing_cik += 1
+                        logger.debug(
+                            "cluster_excluded_no_cik",
+                            ticker=cluster.get("ticker", "unknown"),
+                        )
+                        continue
+
+                    # Skip if CIK not mapped to ticker
+                    ticker = mapper.get_ticker(issuer_cik)
+                    if not ticker:
+                        stats.unmapped_cik += 1
+                        logger.debug(
+                            "cluster_excluded_unmapped_cik",
+                            issuer_cik=issuer_cik,
+                            ticker=cluster.get("ticker", "unknown"),
+                        )
+                        continue
+
+                    # CIK resolved successfully
+                    stats.resolved += 1
+                    validated_batch.append(cluster)
+
+                if not validated_batch:
+                    continue
+
+                # Process validated batch asynchronously
+                enriched_batch = await enricher.enrich_batch(validated_batch)
 
                 # Write each enriched cluster
                 for cluster in enriched_batch:
@@ -220,8 +271,9 @@ async def enrich_streaming(
                                 error=str(e),
                             )
 
+                    issuer_cik = cluster.get("issuer_cik", "?")
                     ticker = cluster.get("ticker", "?")
-                    print(f"  [{processed}/{total_clusters}] Enriched {ticker}")
+                    print(f"  [{processed}/{total_clusters}] Enriched {issuer_cik} ({ticker})")
 
             # Close rows array and add metadata
             out_file.write("\n]")
@@ -264,6 +316,9 @@ async def enrich_small_file(
     output_path = file_path.with_name(f"{file_path.stem}_enriched{file_path.suffix}")
     stats = EnrichmentStats()
     start_time = time.time()
+
+    # Initialize CIK-ticker mapper for pre-validation
+    mapper = get_mapper()
 
     # Load entire file
     with open(file_path) as f:
@@ -314,7 +369,33 @@ async def enrich_small_file(
                 logger.warning("shutdown_requested", processed=i)
                 break
 
+            issuer_cik = cluster.get("issuer_cik")
             ticker = cluster.get("ticker", f"row_{i}")
+
+            # Pre-validate: skip if no CIK
+            if not issuer_cik:
+                stats.missing_cik += 1
+                logger.debug(
+                    "cluster_excluded_no_cik",
+                    ticker=ticker,
+                )
+                # Excluded clusters are NOT appended to output
+                continue
+
+            # Pre-validate: skip if CIK not mapped to ticker
+            resolved_ticker = mapper.get_ticker(issuer_cik)
+            if not resolved_ticker:
+                stats.unmapped_cik += 1
+                logger.debug(
+                    "cluster_excluded_unmapped_cik",
+                    issuer_cik=issuer_cik,
+                    ticker=ticker,
+                )
+                # Excluded clusters are NOT appended to output
+                continue
+
+            # CIK resolved successfully
+            stats.resolved += 1
 
             try:
                 enriched = await enricher.enrich_cluster(cluster)
@@ -346,6 +427,7 @@ async def enrich_small_file(
                 logger.error(
                     "enrichment_error",
                     ticker=ticker,
+                    issuer_cik=issuer_cik,
                     error=str(e),
                     error_type=type(e).__name__,
                 )
@@ -354,7 +436,7 @@ async def enrich_small_file(
                 stats.errors += 1
                 stats.total_clusters += 1
 
-            print(f"  [{i + 1}/{total}] Enriched {ticker}")
+            print(f"  [{i + 1}/{total}] Enriched {issuer_cik} ({ticker})")
 
             # Save checkpoint periodically
             if checkpoint_mgr and (i + 1) % CHECKPOINT_FREQUENCY == 0:
