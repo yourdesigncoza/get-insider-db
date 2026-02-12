@@ -170,10 +170,11 @@ Plans:
   4. Clusters with valid CIK but no ticker mapping excluded from enrichment output entirely
   5. Enrichment completion prints resolution statistics: "45/50 resolved, 3 missing CIK, 2 no ticker mapping"
   6. Progress logs display format "CIK (TICKER)" throughout enrichment runs
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 17-01: TBD
+- [ ] 17-01-PLAN.md --- Sync enrichment CIK migration (enrich_clusters_with_price.py)
+- [ ] 17-02-PLAN.md --- Async enrichment CIK migration (enrichment_service.py + enrich_clusters_async.py)
 
 ## Progress
 
