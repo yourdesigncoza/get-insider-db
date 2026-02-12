@@ -154,10 +154,10 @@ Plans:
   3. Existing ticker-based price data dropped (fresh start approach)
   4. market_fundamentals table re-keyed to CIK using same pattern as market_prices
   5. cluster_events table re-keyed from ticker to issuer_cik
-**Plans**: TBD
+**Plans**: 1 plan
 
 Plans:
-- [ ] 16-01: TBD
+- [ ] 16-01-PLAN.md --- Migration SQL scripts + schema.sql DDL update for CIK-based keys
 
 #### Phase 17: Enrichment Pipeline Migration
 **Goal**: Price enrichment works with CIK as primary key, tickers resolved for API calls
