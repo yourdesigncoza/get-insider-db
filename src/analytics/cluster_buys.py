@@ -25,6 +25,18 @@ from src.scoring_config.scoring_weights import CLUSTER_THRESHOLDS
 logger = get_logger(__name__)
 
 
+def calc_fund_ratio(num_fund_like: int, total_insiders: int) -> float:
+    """Compute fund ratio with zero-denom safety and 1.0 cap.
+
+    Returns 0.0 when total_insiders <= 0.
+    Caps result at 1.0 for data integrity (handles bad source data
+    where num_fund_like > total_insiders).
+    """
+    if total_insiders <= 0:
+        return 0.0
+    return min(num_fund_like / total_insiders, 1.0)
+
+
 def _first_nonempty(series: pd.Series) -> str:
     """
     Helper for groupby aggregations to pull the first non-blank string.
@@ -766,7 +778,7 @@ def find_cluster_buys(
                     "num_insiders": int(num_people),
                     "num_total_insiders": int(total_unique_insiders),
                     "num_fund_like": int(num_fund_like),
-                    "fund_ratio": float(num_fund_like / max(total_unique_insiders, 1)),
+                    "fund_ratio": calc_fund_ratio(int(num_fund_like), int(total_unique_insiders)),
                     "total_shares": float(total_shares),
                     "total_value": float(total_value),
                     "top_insiders": top_insiders,
@@ -1159,7 +1171,7 @@ def find_tradeable_cluster_signals(
                     "num_insiders": int(num_people),
                     "num_total_insiders": total_unique_insiders,
                     "num_fund_like": int(num_fund_like),
-                    "fund_ratio": float(num_fund_like / max(total_unique_insiders, 1)),
+                    "fund_ratio": calc_fund_ratio(int(num_fund_like), total_unique_insiders),
                     "total_shares": total_shares,
                     "total_value": total_value,
                     "top_insiders": ", ".join(people),
