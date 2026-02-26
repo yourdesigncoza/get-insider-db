@@ -143,6 +143,18 @@ def load_cik_ticker_map(engine: Engine) -> dict[str, str]:
     return {r[0]: r[1] for r in rows}
 
 
+def load_sector_map(engine: Engine) -> dict[str, dict]:
+    """Load issuer_cik -> {sic_code, sic_description} from sector_lookup."""
+    with engine.connect() as conn:
+        rows = conn.execute(text(
+            "SELECT issuer_cik, sic_code, sic_description FROM sector_lookup"
+        )).fetchall()
+    return {
+        r[0]: {"sic_code": r[1], "sic_description": r[2]}
+        for r in rows
+    }
+
+
 def resolve_ticker(row: dict, cik_map: dict[str, str]) -> str:
     """Resolve the best ticker for a cluster row. CIK map takes priority."""
     cik = row.get("issuer_cik", "")
