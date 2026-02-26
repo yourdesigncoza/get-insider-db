@@ -76,6 +76,8 @@ Load SEC data → Dashboard (daily screening) → Deep-dive with scan/enrich/bac
    - `--window-days` (10) — rolling window size
    - `--limit` (20) — max rows to display
    - `--json` — output JSON instead of Rich table
+   - `--no-sector-filter` — disable sector blocklist (blocked sectors hidden by default)
+   - `--links` — print SEC EDGAR filing links below the table
 
    **Backtest insight:** The "Hist 90d Win%" column shows historical win rates by $/insider bucket. Signals under $50K/insider have historically outperformed (56% win rate) vs the 50% baseline. Filter for these with:
    ```bash
