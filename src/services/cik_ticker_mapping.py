@@ -41,7 +41,10 @@ class CikTickerMapper:
 
     def get_ticker(self, issuer_cik: str) -> Optional[str]:
         """Get ticker for a CIK. Returns None if not found."""
-        return self._cache.get(issuer_cik)
+        ticker = self._cache.get(issuer_cik)
+        if ticker and ',' in ticker:
+            ticker = ticker.split(',')[0].strip()
+        return ticker
 
     def get_cik(self, ticker: str) -> Optional[str]:
         """Get CIK for a ticker (reverse lookup). Returns None if not found."""

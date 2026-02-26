@@ -838,6 +838,24 @@ COMMENT ON COLUMN public.signal_history.event_type IS 'created|status_changed|sc
 COMMENT ON COLUMN public.signal_history.changed_by IS 'Actor: system|enrichment|manual|decay_job|backtest';
 
 
+--
+-- Sector lookup for SIC-code-based filtering
+--
+
+CREATE TABLE IF NOT EXISTS public.sector_lookup (
+    issuer_cik  TEXT PRIMARY KEY,
+    ticker      TEXT,
+    sic_code    TEXT,
+    sic_description TEXT,
+    sector      TEXT,
+    updated_at  TIMESTAMPTZ DEFAULT now()
+);
+
+ALTER TABLE public.sector_lookup OWNER TO myuser;
+
+CREATE INDEX IF NOT EXISTS idx_sector_lookup_sic ON public.sector_lookup (sic_code);
+
+
 -- Completed on 2026-01-26 21:30:56 SAST
 
 --

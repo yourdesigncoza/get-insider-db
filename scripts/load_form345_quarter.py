@@ -87,7 +87,7 @@ def refresh_cik_ticker_mapping(engine: Engine) -> None:
             FROM (
                 SELECT DISTINCT ON (s."ISSUERCIK")
                     s."ISSUERCIK" AS issuer_cik,
-                    s."ISSUERTRADINGSYMBOL" AS ticker,
+                    TRIM(SPLIT_PART(s."ISSUERTRADINGSYMBOL", ',', 1)) AS ticker,
                     s."ISSUERNAME" AS issuer_name,
                     MAX(s."FILING_DATE"::date) AS last_seen_date
                 FROM form345_submission s

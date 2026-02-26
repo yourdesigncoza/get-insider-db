@@ -32,6 +32,8 @@ except ImportError:
 
 from src.analytics.cluster_buys import get_top_cluster_buys
 from src.analytics.duplicate_handling import deduplicate_by_highest_score, annotate_duplicates
+from src.analytics.sector_filter import apply_sector_blocklist
+from src.config import get_engine
 from src.scoring_config.scoring_weights import CLUSTER_THRESHOLDS
 
 # Floating-point fields to round to 2 decimals for export readability (OUT-02)
@@ -256,6 +258,11 @@ def main() -> None:
         help="Disable insider_exclusions filter (include fund/inst insiders)",
     )
     parser.add_argument(
+        "--no-sector-filter",
+        action="store_true",
+        help="Disable sector blocklist filter (include airlines, banks, etc.)",
+    )
+    parser.add_argument(
         "--output-dir",
         type=str,
         default="exports/cluster_runs",
@@ -308,6 +315,19 @@ def main() -> None:
         print("No cluster buys found with the given filters.")
         return
 
+    # Sector blocklist post-filter
+    sector_blocked: list = []
+    if not args.no_sector_filter:
+        engine = get_engine()
+        df, sector_blocked = apply_sector_blocklist(df, engine)
+        if sector_blocked:
+            tickers = ", ".join(b["ticker"] or b["issuer_cik"] for b in sector_blocked)
+            print(f"Sector filter: removed {len(sector_blocked)} clusters "
+                  f"in blocked industries ({tickers})")
+        if df.empty:
+            print("All clusters filtered by sector blocklist.")
+            return
+
     # Track pre-processing counts
     total_clusters = len(df)
     unique_tickers = df['ticker'].nunique()
@@ -351,6 +371,9 @@ def main() -> None:
         "row_count": len(out_df),
         "deduplicated": args.deduplicate,
         "unique_tickers": df['ticker'].nunique(),
+        "sector_filter_enabled": not args.no_sector_filter,
+        "sector_blocked_count": len(sector_blocked),
+        "sector_blocked_tickers": [b["ticker"] for b in sector_blocked if b.get("ticker")],
         "filters": {
             "window_days": args.window_days,
             "lookback_days": args.lookback_days,

@@ -62,7 +62,7 @@ class CheckpointManager:
                     INSERT INTO enrichment_checkpoints
                         (run_id, last_processed_index, processed_tickers, errors, updated_at)
                     VALUES
-                        (:run_id, :idx, :tickers::jsonb, :errors::jsonb, :now)
+                        (:run_id, :idx, CAST(:tickers AS jsonb), CAST(:errors AS jsonb), :now)
                     ON CONFLICT (run_id) DO UPDATE SET
                         last_processed_index = EXCLUDED.last_processed_index,
                         processed_tickers = EXCLUDED.processed_tickers,
