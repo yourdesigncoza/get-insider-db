@@ -25,19 +25,23 @@ from src.config import get_engine
 from src.services.cluster_detection_fast import (
     detect_clusters_fast,
     load_cik_ticker_map,
+    load_sector_map,
     resolve_ticker,
 )
+from src.scoring_config.sector_blocklist import is_sic_blocked
 from src.analytics.historical_rates import (
     load_historical_rates,
     get_bucket_for_cluster,
 )
 
 
-def build_dashboard_rows(clusters, cik_map, rates):
+def build_dashboard_rows(clusters, cik_map, rates, sector_map):
     """Enrich cluster rows with resolved tickers and historical context."""
     rows = []
     for c in clusters:
         resolved = resolve_ticker(c, cik_map)
+        sector_info = sector_map.get(c["issuer_cik"], {})
+        sector_label = sector_info.get("sic_description", "")
         vpi = c["value_per_insider"]
 
         bucket = get_bucket_for_cluster(rates, vpi)
@@ -49,6 +53,7 @@ def build_dashboard_rows(clusters, cik_map, rates):
         rows.append({
             **c,
             "display_ticker": resolved if resolved != c["ticker"] else c["ticker"],
+            "sector": sector_label,
             "hist_90d": hist_label,
         })
 
@@ -83,6 +88,7 @@ def print_rich_table(rows, days_back, rates):
 
     table = Table(show_header=True, header_style="bold cyan", box=box.SIMPLE_HEAVY)
     table.add_column("Ticker", justify="left", no_wrap=True)
+    table.add_column("Sector", justify="left", no_wrap=True)
     table.add_column("CIK", justify="left", no_wrap=True)
     table.add_column("Insiders", justify="right", no_wrap=True)
     table.add_column("$/Insider", justify="right", no_wrap=True)
@@ -94,6 +100,7 @@ def print_rich_table(rows, days_back, rates):
     for r in rows:
         table.add_row(
             r["display_ticker"],
+            _truncate(r.get("sector", ""), 25),
             r["issuer_cik"],
             str(r["num_insiders"]),
             f"${r['value_per_insider']:,.0f}",
@@ -149,12 +156,17 @@ def main():
         "--json", action="store_true", dest="json_output",
         help="Output JSON instead of Rich table",
     )
+    parser.add_argument(
+        "--no-sector-filter", action="store_true",
+        help="Disable sector blocklist filtering (blocked sectors hidden by default)",
+    )
     args = parser.parse_args()
 
     engine = get_engine()
 
     # 1. Load CIK-ticker map
     cik_map = load_cik_ticker_map(engine)
+    sector_map = load_sector_map(engine)
 
     # 2. Run cluster detection
     end_date = datetime.now(timezone.utc).date()
@@ -181,6 +193,21 @@ def main():
             if c["value_per_insider"] <= args.max_value_per_insider
         ]
 
+    # 3b. Filter blocked sectors (unless --no-sector-filter)
+    if not args.no_sector_filter:
+        filtered = []
+        for c in clusters:
+            sector_info = sector_map.get(c["issuer_cik"])
+            if sector_info and sector_info["sic_code"]:
+                try:
+                    blocked, _ = is_sic_blocked(int(sector_info["sic_code"]))
+                except (ValueError, TypeError):
+                    blocked = False
+                if blocked:
+                    continue
+            filtered.append(c)
+        clusters = filtered
+
     # 4. Deduplicate: keep highest-value cluster per ticker
     best_per_ticker = {}
     for c in clusters:
@@ -193,7 +220,7 @@ def main():
     rates = load_historical_rates()
 
     # 6. Build enriched rows
-    rows = build_dashboard_rows(clusters, cik_map, rates)
+    rows = build_dashboard_rows(clusters, cik_map, rates, sector_map)
 
     # 7. Apply limit
     rows = rows[: args.limit]
