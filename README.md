@@ -30,13 +30,14 @@ When multiple corporate insiders buy their own company's stock within the same s
 ## Typical Workflow
 
 ```
-Load SEC data → Scan for clusters → Enrich with prices → Backtest
+Load SEC data → Dashboard (daily screening) → Deep-dive with scan/enrich/backtest
 ```
 
 1. **Load** quarterly SEC Form 345 TSVs into the database
-2. **Scan** for cluster buy events — detects, scores, and writes JSON
-3. **Enrich** the JSON with forward price data (returns, drawdowns) via Alpha Vantage
-4. **Backtest** cluster signals across a date range to evaluate strategy performance
+2. **Dashboard** — check recent insider cluster activity with historical context
+3. **Scan** for cluster buy events — detects, scores, and writes JSON
+4. **Enrich** the JSON with forward price data (returns, drawdowns) via Alpha Vantage
+5. **Backtest** cluster signals across a date range to evaluate strategy performance
 
 ## Setup & Usage
 1. **Install requirements**
@@ -60,9 +61,30 @@ Load SEC data → Scan for clusters → Enrich with prices → Backtest
      ```bash
      python scripts/load_form345_quarter.py
      ```
-5. **Run cluster analysis**
+5. **Dashboard** — quick daily screening
+   ```bash
+   python scripts/dashboard.py --days-back 30
+   ```
+   Shows recent insider cluster buys ranked by $/insider, with historical win rate context from 5 years of backtest data (4,000+ signals).
 
-   **5a. Scan clusters (JSON)**
+   Key flags:
+   - `--days-back` (30) — lookback window
+   - `--min-insiders` (2) — minimum distinct insiders
+   - `--min-total-value` (100K) — minimum cluster dollar value
+   - `--min-value-per-insider` (0) — floor for $/insider
+   - `--max-value-per-insider` (0 = no cap) — ceiling for $/insider
+   - `--window-days` (10) — rolling window size
+   - `--limit` (20) — max rows to display
+   - `--json` — output JSON instead of Rich table
+
+   **Backtest insight:** The "Hist 90d Win%" column shows historical win rates by $/insider bucket. Signals under $50K/insider have historically outperformed (56% win rate) vs the 50% baseline. Filter for these with:
+   ```bash
+   python scripts/dashboard.py --days-back 90 --max-value-per-insider 50000
+   ```
+
+6. **Run cluster analysis**
+
+   **6a. Scan clusters (JSON)**
    Scan for cluster events and output to JSON for downstream analysis or enrichment. Add `--print` to also display a formatted table in the console.
    ```bash
    python scripts/scan_clusters.py \
@@ -92,7 +114,7 @@ Load SEC data → Scan for clusters → Enrich with prices → Backtest
    }
    ```
 
-   **5b. Backtest strategy**
+   **6b. Backtest strategy**
    Backtest tradeable cluster signals over a date range using cached market prices.
    ```bash
    python scripts/backtest_cluster_strategy.py \
@@ -102,7 +124,7 @@ Load SEC data → Scan for clusters → Enrich with prices → Backtest
      --out-csv results.csv
    ```
    Required: `--start-filing-date`, `--end-filing-date`. Key optional flags: `--horizons` (`30,60,90`), `--entry-delay-days` (`0`), `--min-insiders` (3), `--min-total-value` (500K, config-driven), `--min-trade-value` (50K, config-driven), `--out-csv`, `--cooldown-days` (0).
-6. **Enrich with Alpha Vantage prices**
+7. **Enrich with Alpha Vantage prices**
    ```bash
    python scripts/enrich_clusters_with_price.py exports/cluster_runs/<export>.json
    ```
@@ -135,9 +157,10 @@ CLI flags (`--min-cluster-score`, `--max-fund-ratio`, etc.) override config defa
 
 ## Project Structure
 - `src/` — core library (config, classification, role weighting, cluster scoring).
-- `src/analytics/` — cluster detection, feature engineering, buy signal helpers.
-- `scripts/` — CLI entrypoints for loading data, showing/exporting clusters, and price enrichment.
+- `src/analytics/` — cluster detection, feature engineering, buy signal helpers, historical win rate computation.
+- `src/services/` — shared service modules (CIK-ticker mapping, fast SQL cluster detection).
+- `scripts/` — CLI entrypoints: `dashboard.py` (daily screening), `scan_clusters.py` (detailed analysis), `fast_scan_for_backtest.py` / `fast_enrich_backtest.py` (backtesting pipeline), data loading, and price enrichment.
 - `docs/` — design notes and analytical rationale.
 - `schema.sql`, `sql/` — database DDL and helper SQL.
-- `data/` — extracted SEC TSVs (not tracked); `exports/` — saved cluster runs.
-- `tests/` — unit tests for scoring and classification utilities.
+- `data/` — extracted SEC TSVs (not tracked); `exports/` — saved cluster runs and backtest results.
+- `tests/` — unit tests for scoring, classification, and historical rate computation.

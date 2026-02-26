@@ -134,6 +134,10 @@ def main():
         help="Minimum $/insider filter (default: 0)",
     )
     parser.add_argument(
+        "--max-value-per-insider", type=float, default=0,
+        help="Maximum $/insider filter (default: 0 = no cap)",
+    )
+    parser.add_argument(
         "--window-days", type=int, default=10,
         help="Rolling window size in days (default: 10)",
     )
@@ -170,6 +174,11 @@ def main():
         clusters = [
             c for c in clusters
             if c["value_per_insider"] >= args.min_value_per_insider
+        ]
+    if args.max_value_per_insider > 0:
+        clusters = [
+            c for c in clusters
+            if c["value_per_insider"] <= args.max_value_per_insider
         ]
 
     # 4. Deduplicate: keep highest-value cluster per ticker
