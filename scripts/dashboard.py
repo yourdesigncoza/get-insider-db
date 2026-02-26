@@ -222,17 +222,19 @@ def main():
         ]
 
     # 3b. Filter blocked sectors (unless --no-sector-filter)
+    #     Also filters out issuers with no SIC code (funds, SPACs, etc.)
     if not args.no_sector_filter:
         filtered = []
         for c in clusters:
             sector_info = sector_map.get(c["issuer_cik"])
-            if sector_info and sector_info["sic_code"]:
-                try:
-                    blocked, _ = is_sic_blocked(int(sector_info["sic_code"]))
-                except (ValueError, TypeError):
-                    blocked = False
-                if blocked:
-                    continue
+            if not sector_info or not sector_info["sic_code"]:
+                continue  # no SIC data → skip
+            try:
+                blocked, _ = is_sic_blocked(int(sector_info["sic_code"]))
+            except (ValueError, TypeError):
+                blocked = False
+            if blocked:
+                continue
             filtered.append(c)
         clusters = filtered
 
