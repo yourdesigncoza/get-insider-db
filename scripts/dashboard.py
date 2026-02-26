@@ -54,6 +54,7 @@ def build_dashboard_rows(clusters, cik_map, rates, sector_map):
             **c,
             "display_ticker": resolved if resolved != c["ticker"] else c["ticker"],
             "sector": sector_label,
+            "sec_url": _sec_edgar_url(c["issuer_cik"]),
             "hist_90d": hist_label,
         })
 
@@ -120,6 +121,29 @@ def _truncate(s, max_len):
     return s[: max_len - 1] + "\u2026"
 
 
+def _sec_edgar_url(issuer_cik: str) -> str:
+    """Build SEC EDGAR Form 4 filing search URL for a CIK."""
+    padded = issuer_cik.zfill(10)
+    return (
+        f"https://www.sec.gov/cgi-bin/browse-edgar"
+        f"?action=getcompany&CIK={padded}&type=4"
+        f"&dateb=&owner=include&count=10"
+    )
+
+
+def print_sec_links(rows):
+    """Print SEC EDGAR filing links for each cluster."""
+    console = Console()
+    console.print()
+    console.rule("[bold]SEC Filing Links[/bold]")
+    console.print()
+    for r in rows:
+        ticker = r["display_ticker"]
+        url = _sec_edgar_url(r["issuer_cik"])
+        console.print(f"  {ticker:8s} {url}")
+    console.print()
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Insider cluster dashboard with historical context"
@@ -159,6 +183,10 @@ def main():
     parser.add_argument(
         "--no-sector-filter", action="store_true",
         help="Disable sector blocklist filtering (blocked sectors hidden by default)",
+    )
+    parser.add_argument(
+        "--links", action="store_true",
+        help="Print SEC EDGAR filing links below the table",
     )
     args = parser.parse_args()
 
@@ -247,6 +275,8 @@ def main():
         print(json.dumps(output, indent=2, default=str))
     else:
         print_rich_table(rows, args.days_back, rates)
+        if args.links:
+            print_sec_links(rows)
 
 
 if __name__ == "__main__":
