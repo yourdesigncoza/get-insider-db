@@ -23,3 +23,23 @@
 - `README.md` — dashboard docs added as step 5
 
 **Gemini review:** Clean integration, no actionable bugs. Noted pre-existing quarter-grouping heuristic and ticker-vs-CIK join as future improvement areas.
+
+## 2026-02-26: Sector Column + SEC Links
+**Scope:** Added sector context and SEC EDGAR links to dashboard. Blocked sectors filtered by default.
+
+**Commits:**
+1. `feat: add load_sector_map() to shared services`
+2. `feat: add sector column and blocklist filter to dashboard`
+3. `feat: add --links flag for SEC EDGAR filing URLs`
+4. `docs: add sector filter and links flags to README`
+5. `fix: filter out issuers with no SIC code from dashboard by default`
+
+**New files:**
+- `tests/test_cluster_detection_fast.py` — 2 tests for `load_sector_map()`
+- `docs/plans/2026-02-26-sector-and-links-design.md` — design doc
+- `docs/plans/2026-02-26-sector-and-links-plan.md` — implementation plan
+
+**Modified files:**
+- `src/services/cluster_detection_fast.py` — added `load_sector_map()`
+- `scripts/dashboard.py` — sector column, blocklist filter, `--links`, `--no-sector-filter`
+- `README.md` — documented new flags

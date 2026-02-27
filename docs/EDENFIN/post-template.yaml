@@ -1,0 +1,256 @@
+# ============================================================================
+# Edenfintech Investment Analysis Post Template
+# ============================================================================
+# Recommendation types: BUY | PASS | WATCHLIST | SHARE
+#
+# Section visibility:
+#   post_visible  = appears in published Substack post
+#   internal_only = analysis scaffolding, not published
+#
+# Workflow:
+#   PASS   → stops after first_filter (Steps 3-8 skipped)
+#   SHARE  → full analysis, decision explains opportunity cost
+#   BUY    → full analysis + position_sizing + post_buy monitoring
+# ============================================================================
+
+# --- META (internal_only) ---
+meta:
+  ticker: ""
+  company_name: ""
+  sector: ""
+  industry: ""
+  market_cap: ""
+  current_price: ""
+  52wk_range: ""
+  date: "YYYY-MM-DD"
+  recommendation: ""  # BUY | PASS | WATCHLIST | SHARE
+
+# --- STEP 1: IDEA SOURCING (internal_only) ---
+# Source is always the Edenfintech insider trading pipeline
+cluster_signal:
+  window_start: "YYYY-MM-DD"
+  window_end: "YYYY-MM-DD"
+  signal_filing_date: "YYYY-MM-DD"
+  entry_date: "YYYY-MM-DD"
+  num_insiders: 0
+  top_insiders: ""          # names + roles
+  total_value: "$0"
+  cluster_score: "0 / 100"
+  fund_ratio: "0.0"
+  key_roles: ""             # CEO, CFO, Director, etc.
+  avg_percent_change: "0%"
+  avg_days_to_file: "0"
+
+screening_gates:
+  avoid_list_check: ""      # CLEAR | FLAGGED — check against avoid_list below
+  secular_decline_check: "" # CLEAR | FLAGGED — permanently shrinking industries excluded regardless of price
+  understandable: ""        # YES | NO
+  broken_chart: ""          # "X% decline from highs" (contextual, not a gate)
+  # Industries Edenfintech avoids (outside circle of competence or capital-destructive):
+  avoid_list:
+    pure_ai: "Too speculative, hard to value, outside competence"
+    airlines: "Capital-destructive, razor-thin margins, commodity pricing"
+    banks: "Complex balance sheets, hard to evaluate risk"
+    biotech: "Binary outcomes (drug works or doesn't), outside competence"
+    car_manufacturers: "Cyclical, capital-intensive, low returns on capital"
+    insurance: "Complex (float, reserves), requires specialized knowledge"
+    marine_freight: "Volatile, commodity-driven, hard to predict"
+    precious_metal_miners: "Commodity prices out of anyone's control"
+    restaurants: "High failure rates, intense competition, low margins"
+    tobacco: "Secular decline in smoking"
+    textiles: "Low barriers, race-to-the-bottom pricing"
+    trading_firms: "Opaque, unpredictable"
+    most_software: "Often overvalued, hard to assess durability"
+    video_games: "Hit-driven, unpredictable revenue"
+
+# --- INTRO (post_visible) ---
+intro:
+  hook: ""                  # 3-4 sentence credibility opener, Edenfintech voice
+  company_teaser: ""        # ticker + nickname + % decline + why on radar
+  ownership_note: ""        # "Position taken" | "Not a position" | "Cluster signal - under review"
+
+# --- TLDR (post_visible, optional, recommended for complex companies) ---
+tldr:
+  what_they_do: ""          # 1-2 sentences
+  why_interesting: ""       # 1-2 sentences
+  risks: ""                 # 1-2 sentences
+  valuation_summary: ""     # target price, % upside, CAGR
+
+# --- THESIS QUESTIONS (post_visible) ---
+# 1-3 questions that gate the recommendation
+thesis_questions:
+  - ""
+
+# --- STEP 2: FIRST FILTER (post_visible as scorecard table) ---
+first_filter:
+  solvency:
+    result: ""              # PASS | FAIL | WARN
+    evidence: ""
+  dilution:
+    result: ""
+    evidence: ""
+  revenue_growth:
+    result: ""
+    evidence: ""
+  roce_roic:
+    result: ""
+    evidence: ""
+  valuation:
+    result: ""
+    evidence: ""
+  estimated_cagr: ""        # "X%"
+  proceed: ""               # "YES" | "NO" | "WATCHLIST @ $X"
+  # If any FAIL -> stop here, write PASS recommendation
+
+# --- STEP 3: COMPETITOR COMPARISON (post_visible if reached) ---
+competitor_compare:
+  peers: []                 # [ticker1, ticker2, ticker3]
+  metrics_table: []
+    # For each peer: leverage, ROIC_median, gross_margin, revenue_growth_5yr, dilution_trend
+    # - ticker: ""
+    #   leverage: ""
+    #   roic_median: ""
+    #   gross_margin: ""
+    #   revenue_growth_5yr: ""
+    #   dilution_trend: ""
+  quality_rank: ""          # "X of Y"
+  margin_trend: ""          # "Stable | Improving | Declining" (declining = permanent pass)
+  balance_sheet_rank: ""
+  business_cycle_history: "" # how company performed in prior downturns
+
+# --- STEP 4: QUALITATIVE DEEP DIVE (post_visible: catalysts, management, issues woven into narrative) ---
+qualitative:
+  moat:
+    types: []               # low_cost | regulatory | switching_costs | network_effects | capital_requirements | brand
+    confidence: ""          # H | M | L
+    evidence: ""
+  management:
+    name: ""
+    background: ""
+    track_record: ""
+    right_for_situation: "" # turnarounds need operators, not visionaries
+    ownership_pct: ""
+  issues_and_fixes:
+    - issue: ""
+      specific_fix: ""
+      early_results: ""
+  compensation:
+    metrics_driving_pay: [] # FCF, EPS, revenue, EBITDA
+    red_flags: []           # broken promises, vague language, promotional
+    alignment: ""           # Good | Mixed | Poor
+  catalysts:
+    - type: ""              # margin_expansion | new_leadership | regulatory | faster_growth | rates | demographic | demand | divestiture | combination
+      description: ""
+      timeline: ""
+  hard_rule_check: ""       # "Catalysts found? YES | NO" (NO = PASS immediately)
+
+# --- BUSINESS OVERVIEW (post_visible) ---
+business_overview:
+  description: ""           # 2-3 paragraphs
+  segments:
+    - name: ""
+      pct_revenue: ""       # "X%"
+      role: ""
+  business_model: ""        # why customers choose them
+  competitive_positioning: "" # vs alternatives, not just direct competitors
+
+# --- BULLISH CASE (post_visible, 2-4 subsections) ---
+bullish_case:
+  sections:
+    - title: ""
+      narrative: ""
+      data_points: []
+      charts: []            # placeholder references
+
+# --- RISKS (post_visible, 3-7 items) ---
+risks:
+  - category: ""            # execution | macro | structural | regulatory | geopolitical | operational
+    description: ""
+    severity: ""            # high | medium | low
+    mitigation: ""
+
+# --- STEP 5: VALUATION (post_visible if reached: Revenue -> Margin -> Multiple -> Price) ---
+valuation:
+  timeframe: ""             # "Year-end 20XX" or "1H 20XX"
+  revenue:
+    estimate: ""            # "$X"
+    basis: ""               # industry baseline + company initiatives + management targets + catalysts
+  fcf_margin:
+    estimate: ""            # "X%"
+    basis: ""               # historical avg, adjusted for cost cuts / headwinds
+  fcf:
+    estimate: ""            # "$X"
+  multiple:
+    estimate: ""            # "Xx"
+    basis: ""               # industry baseline, adjusted for quality/growth/leverage/risk
+  share_count:
+    estimate: ""            # "XM"
+    trend: ""               # flat | shrinking (buybacks) | growing (dilution)
+  price_target: ""          # "$X"
+  market_cap: ""            # "$X"
+  cagr: ""                  # "X%"
+  meets_hurdle: ""          # "YES" | "NO" | "EXCEPTION (20%+ with top-tier CEO, 6yr+ runway)"
+  return_sources:
+    earnings_growth_pct: "" # "X%"
+    multiple_expansion_pct: "" # "X%"
+    buybacks_pct: ""        # "X%"
+    # Flag if 100% multiple expansion: "High Risk - sentiment dependent"
+  worst_case:
+    method: ""              # tangible_book | historical_trough | scenario_floor
+    price: ""               # "$X"
+    pct_downside: ""        # "X%"
+    narrative: ""
+  gut_check: ""             # "Does implied valuation make sense vs own history + peers?"
+
+# --- STEP 6: DECISION SCORE (post_visible: recommendation + pre_mortem) ---
+decision:
+  score_inputs:
+    worst_case_downside:
+      value: ""             # "X%"
+      weight: "45%"
+    base_case_probability:
+      value: ""             # "X%"
+      weight: "40%"
+    base_case_cagr:
+      value: ""             # "X%"
+      weight: "15%"
+    composite_score: ""     # "X"
+  deployment_scenario: ""   # "1 (have cash)" | "2 (no cash, replace)" | "3 (no cash, maxed theme)"
+  recommendation: ""        # BUY | WATCHLIST @ $X | PASS | SHARE
+  pre_mortem: ""            # required for BUY: 1 paragraph on how this investment fails
+  opportunity_cost: ""      # for SHARE/NO-BUY: why it doesn't beat existing holdings
+
+# --- STEP 7: POSITION SIZING (internal_only, mentioned briefly in post for BUY) ---
+position_sizing:
+  suggested_pct: ""         # "X%"
+  breakpoint_check:
+    cagr_above_30: false    # false = 0% allocation
+    probability_above_60: false  # false = 0% allocation
+    downside_80_99: false   # if true, capped at 5%
+    downside_100: false     # if true, capped at 3%
+
+# --- STEP 8: POST-BUY (post_visible for BUY as "what to watch" section) ---
+post_buy:
+  monitoring_questions:
+    - "Are expected catalysts showing up on schedule?"
+    - "Is management saying one thing and doing another?"
+    - "Are margins shifting in ways not modeled?"
+    - "Are competitors pulling ahead?"
+    - "Which macro/geopolitical events actually move the needle?"
+  sell_triggers:
+    - "Forward returns from current price < 30% hurdle"
+    - "Rapid price move -> forward returns < 10-15%/yr"
+    - "Fundamental change breaks thesis"
+  first_review_date: ""     # "YYYY-MM-DD (30 days out)"
+
+# --- FINAL THOUGHTS (post_visible) ---
+final_thoughts:
+  thesis_answers: []        # restate each thesis question with YES | NO | CONDITIONAL
+  one_sentence_thesis: ""
+  key_risk: ""
+  key_catalyst: ""
+
+# --- SOURCES (post_visible) ---
+sources:
+  - title: ""
+    url: ""
